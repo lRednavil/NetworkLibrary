@@ -10,8 +10,8 @@ public:
 	void Stop();
 	int GetSessionCount();
 
-	bool Disconnect(DWORD64 SessionID);
-	bool SendPacket(DWORD64 SessionID, CPacket* packet);
+	bool Disconnect(DWORD64 sessionID);
+	bool SendPacket(DWORD64 sessionID, CPacket* packet);
 
 	virtual bool OnConnectionRequest(WCHAR* IP, DWORD Port) = 0; //< accept 직후
 	//return false; 시 클라이언트 거부.

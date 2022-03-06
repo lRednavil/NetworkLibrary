@@ -29,13 +29,20 @@ int CLanServer::GetSessionCount()
     return sessionCnt;
 }
 
-bool CLanServer::Disconnect(DWORD64 SessionID)
+bool CLanServer::Disconnect(DWORD64 sessionID)
 {
+    
     return false;
 }
 
-bool CLanServer::SendPacket(DWORD64 SessionID, CPacket* packet)
+bool CLanServer::SendPacket(DWORD64 sessionID, CPacket* packet)
 {
+    SESSION* session = FindSession(sessionID);
+
+    session->sendQ.Enqueue((char*)&packet, sizeof(void*));
+
+    SendPost(session);
+
     return false;
 }
 
@@ -180,6 +187,7 @@ bool CLanServer::MakeSession(DWORD64 sessionID, WCHAR* IP, SOCKET sock)
         return false;
     }
 
+    sessionCnt++;
     //recv start
     return RecvPost(session);
 }
