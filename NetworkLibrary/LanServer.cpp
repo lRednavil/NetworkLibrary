@@ -113,10 +113,10 @@ bool CLanServer::ThreadInit(const DWORD createThreads, const DWORD runningThread
     //add 1 for accept thread
     hThreads = new HANDLE[createThreads + 1];
 
-    hThreads[0] = (HANDLE)_beginthreadex(NULL, 0, AcceptProc, NULL, NULL, NULL);
+    hThreads[0] = (HANDLE)_beginthreadex(NULL, 0, AcceptStartFunc, NULL, NULL, NULL);
 
     for (cnt = 1; cnt <= createThreads; cnt++) {
-        hThreads[cnt] = (HANDLE)_beginthreadex(NULL, 0, WorkProc, NULL, NULL, NULL);
+        hThreads[cnt] = (HANDLE)_beginthreadex(NULL, 0, WorkStartFunc, NULL, NULL, NULL);
     }
 
     hIOCP = CreateIoCompletionPort(NULL, NULL, NULL, runningThreads);
@@ -196,6 +196,18 @@ void CLanServer::ReleaseSession(DWORD64 sessionID, SESSION* session)
 
     //delete에서 풀로 전환가자
     closesocket(sock);
+}
+
+unsigned int _stdcall CLanServer::AcceptStartFunc(void* classPtr)
+{
+    CLanServer* ptr = (CLanServer*)classPtr;
+    return ptr->AcceptProc(NULL);
+}
+
+unsigned int _stdcall CLanServer::WorkStartFunc(void* classPtr)
+{
+    CLanServer* ptr = (CLanServer*)classPtr;
+    return ptr->WorkProc(NULL);
 }
 
 unsigned int __stdcall CLanServer::WorkProc(void* arg)

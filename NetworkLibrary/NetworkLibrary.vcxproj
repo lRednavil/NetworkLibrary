@@ -153,7 +153,6 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="CommonFunction.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="LanClient.h" />
     <ClInclude Include="LanServer.h" />
@@ -166,7 +165,6 @@
     <ClInclude Include="SerializedBuffer.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="CommonFunction.cpp" />
     <ClCompile Include="LanClient.cpp" />
     <ClCompile Include="LanServer.cpp" />
     <ClCompile Include="Lock.cpp" />
