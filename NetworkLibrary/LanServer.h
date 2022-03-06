@@ -57,6 +57,8 @@ private:
 	bool	MakeSession(DWORD64 sessionID, WCHAR* IP, SOCKET sock);
 	void	ReleaseSession(DWORD64 sessionID, SESSION* session);
 
+	static unsigned int _stdcall AcceptStartFunc(void* classPtr);
+	static unsigned int _stdcall WorkStartFunc(void* classPtr);
 	unsigned int __stdcall WorkProc(void* arg);
 	unsigned int __stdcall AcceptProc(void* arg);
 	void RecvProc(SESSION* session);
