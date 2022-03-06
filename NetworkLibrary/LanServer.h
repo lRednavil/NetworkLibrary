@@ -2,6 +2,9 @@
 class CLanServer
 {
 public:
+	CLanServer();
+	~CLanServer();
+
 	//오픈 IP / 포트 / 워커스레드 수(생성수, 러닝수) / 나글옵션 / 최대접속자 수
 	bool Start(WCHAR* IP, DWORD port, DWORD createThreads, DWORD runningThreads, bool isNagle, DWORD maxConnect);
 	void Stop();
@@ -51,9 +54,14 @@ private:
 	void ThreadClose();
 
 	SESSION* FindSession(DWORD64 sessionID);
+	bool	MakeSession(DWORD64 sessionID, WCHAR* IP, SOCKET sock);
+	void	ReleaseSession(DWORD64 sessionID, SESSION* session);
 
-	void AcceptProc();
-	void RecvProc();
+	unsigned int __stdcall WorkProc(void* arg);
+	unsigned int __stdcall AcceptProc(void* arg);
+	void RecvProc(SESSION* session);
+	bool RecvPost(SESSION* session);
+	bool SendPost(SESSION* session);
 
 private:
 	//SESSION* sessionArr;
