@@ -21,6 +21,9 @@
 
 #include "RingBuffer.h"
 #include "SerializedBuffer.h"
+#include "Lock.h"
+
+#include <unordered_map> // 나중에 삭제 우선 구현
 
 
 #endif //PCH_H

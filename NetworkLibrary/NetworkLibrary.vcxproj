@@ -156,6 +156,7 @@
     <ClInclude Include="framework.h" />
     <ClInclude Include="LanClient.h" />
     <ClInclude Include="LanServer.h" />
+    <ClInclude Include="Lock.h" />
     <ClInclude Include="NetClient.h" />
     <ClInclude Include="NetServer.h" />
     <ClInclude Include="pch.h" />
@@ -165,6 +166,7 @@
   <ItemGroup>
     <ClCompile Include="LanClient.cpp" />
     <ClCompile Include="LanServer.cpp" />
+    <ClCompile Include="Lock.cpp" />
     <ClCompile Include="NetClient.cpp" />
     <ClCompile Include="NetServer.cpp" />
     <ClCompile Include="NetworkLibrary.cpp" />

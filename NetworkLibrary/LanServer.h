@@ -21,18 +21,6 @@ public:
 	virtual void OnError(int error, WCHAR* msg) = 0;
 
 private:
-	bool NetInit(WCHAR* IP, DWORD port, bool isNagle);
-	bool ThreadInit(const DWORD createThreads, const DWORD runningThreads);
-
-	void NetClose();
-	void ThreadClose();
-
-	void AcceptProc();
-	void RecvProc();
-
-
-
-private:
 	struct OVERLAPPEDEX {
 		OVERLAPPED overlap;
 		WORD type;
@@ -55,12 +43,25 @@ private:
 		WCHAR IP[16];
 	};
 
+private:
+	bool NetInit(WCHAR* IP, DWORD port, bool isNagle);
+	bool ThreadInit(const DWORD createThreads, const DWORD runningThreads);
+
+	void NetClose();
+	void ThreadClose();
+
+	SESSION* FindSession(DWORD64 sessionID);
+
+	void AcceptProc();
+	void RecvProc();
 
 private:
-	SESSION* sessionArr;
+	//SESSION* sessionArr;
+	std::unordered_map<DWORD64, SESSION*> sessionMap; //나중에 삭제
 
 	int lastError;
-	
+	SRWLOCK sessionMapLock;
+
 	//monitor
 	DWORD sessionCnt;
 	BYTE netMode; // << 나중에 화이트리스트 모드 등등 변경용

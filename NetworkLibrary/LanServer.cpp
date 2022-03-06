@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "LanServer.h"
 
+
 bool CLanServer::Start(WCHAR* IP, DWORD port, DWORD createThreads, DWORD runningThreads, bool isNagle, DWORD maxConnect)
 {
     if (NetInit(IP, port, isNagle) == false) {
@@ -11,7 +12,8 @@ bool CLanServer::Start(WCHAR* IP, DWORD port, DWORD createThreads, DWORD running
         return false;
     }
 
-    sessionArr = new SESSION[maxConnect];
+    //sessionArr = new SESSION[maxConnect];
+    InitializeSRWLock(&sessionMapLock);
     isServerOn = true;
 
     return true;
@@ -23,7 +25,7 @@ void CLanServer::Stop()
 
 int CLanServer::GetSessionCount()
 {
-    return 0;
+    return sessionCnt;
 }
 
 bool CLanServer::Disconnect(DWORD64 SessionID)
@@ -124,6 +126,17 @@ bool CLanServer::ThreadInit(const DWORD createThreads, const DWORD runningThread
     }
 
     return true;
+}
+
+CLanServer::SESSION* CLanServer::FindSession(DWORD64 sessionID)
+{
+    CLock _lock(&sessionMapLock, 0);
+
+    if (sessionMap.find(sessionID) == sessionMap.end()) {
+        return NULL;
+    }
+
+    return sessionMap[sessionID];
 }
 
 void CLanServer::AcceptProc()
