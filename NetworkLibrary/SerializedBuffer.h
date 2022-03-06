@@ -141,6 +141,7 @@ public:
 	// Return: (char *)버퍼 포인터.
 	//////////////////////////////////////////////////////////////////////////
 	char* GetBufferPtr(void) { return _buffer; }
+	char* GetWritePtr(void) { return _buffer + _rear; }
 
 	//////////////////////////////////////////////////////////////////////////
 	// 버퍼 Pos 이동. (음수이동은 안됨)
@@ -223,7 +224,7 @@ protected:
 	char* _buffer;
 
 	int	_bufferSize;
-	
+
 	int _head = 0;
 	int _rear = 0;
 };

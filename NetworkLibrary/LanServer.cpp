@@ -29,13 +29,20 @@ int CLanServer::GetSessionCount()
     return sessionCnt;
 }
 
-bool CLanServer::Disconnect(DWORD64 SessionID)
+bool CLanServer::Disconnect(DWORD64 sessionID)
 {
+    
     return false;
 }
 
-bool CLanServer::SendPacket(DWORD64 SessionID, CPacket* packet)
+bool CLanServer::SendPacket(DWORD64 sessionID, CPacket* packet)
 {
+    SESSION* session = FindSession(sessionID);
+
+    session->sendQ.Enqueue((char*)&packet, sizeof(void*));
+
+    SendPost(session);
+
     return false;
 }
 
@@ -180,6 +187,7 @@ bool CLanServer::MakeSession(DWORD64 sessionID, WCHAR* IP, SOCKET sock)
         return false;
     }
 
+    sessionCnt++;
     //recv start
     return RecvPost(session);
 }
@@ -278,7 +286,41 @@ unsigned int __stdcall CLanServer::AcceptProc(void* arg)
 
 void CLanServer::RecvProc(SESSION* session)
 {
-//    OnRecv(session->se)
+    //Packet 떼기 (netHeader 제거)
+    
+    NET_HEADER netHeader;
+    DWORD len;
+    CRingBuffer* recvQ = &session->recvQ;
+
+    for (;;) {
+        CPacket* packet = new CPacket();
+        len = recvQ->GetUsedSize();
+        //길이 판별
+        if (sizeof(netHeader) > len) {
+            delete packet;
+            break;
+        }
+
+        //넷헤더 추출
+        recvQ->Peek((char*)&netHeader, sizeof(netHeader));
+
+        //길이 판별
+        if (sizeof(netHeader) + netHeader.len > len) {
+            delete packet;
+            break;
+        }
+
+        //넷헤더 영역 지나가기
+        recvQ->MoveFront(sizeof(netHeader));
+        //나중에 메세지 헤더 따라 처리 or MsgProc(session, packet)
+        packet->PutData((char*)&netHeader, sizeof(netHeader));
+        recvQ->Dequeue((char*)packet->GetWritePtr(), netHeader.len);
+        packet->MoveWritePos(netHeader.len);
+
+        OnRecv(session->sessionID, packet);
+    }
+
+    RecvPost(session);
 }
 
 bool CLanServer::RecvPost(SESSION* session)
