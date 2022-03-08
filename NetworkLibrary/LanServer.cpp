@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "LanServer.h"
+#include "LanCommon.h"
 
 DWORD64 g_sessionID = 0;
 
@@ -120,10 +121,10 @@ bool CLanServer::ThreadInit(const DWORD createThreads, const DWORD runningThread
     //add 1 for accept thread
     hThreads = new HANDLE[createThreads + 1];
 
-    hThreads[0] = (HANDLE)_beginthreadex(NULL, 0, AcceptStartFunc, NULL, NULL, NULL);
+    hThreads[0] = (HANDLE)_beginthreadex(NULL, 0, CLanServer::AcceptProc, this, NULL, NULL);
 
     for (cnt = 1; cnt <= createThreads; cnt++) {
-        hThreads[cnt] = (HANDLE)_beginthreadex(NULL, 0, WorkStartFunc, NULL, NULL, NULL);
+        hThreads[cnt] = (HANDLE)_beginthreadex(NULL, 0, CLanServer::WorkProc, this, NULL, NULL);
     }
 
     hIOCP = CreateIoCompletionPort(NULL, NULL, NULL, runningThreads);
@@ -141,7 +142,7 @@ bool CLanServer::ThreadInit(const DWORD createThreads, const DWORD runningThread
     return true;
 }
 
-CLanServer::SESSION* CLanServer::FindSession(DWORD64 sessionID)
+SESSION* CLanServer::FindSession(DWORD64 sessionID)
 {
     CLock _lock(&sessionMapLock, 0);
 
@@ -206,18 +207,6 @@ void CLanServer::ReleaseSession(DWORD64 sessionID, SESSION* session)
     closesocket(sock);
 }
 
-unsigned int _stdcall CLanServer::AcceptStartFunc(void* classPtr)
-{
-    CLanServer* ptr = (CLanServer*)classPtr;
-    return ptr->AcceptProc(NULL);
-}
-
-unsigned int _stdcall CLanServer::WorkStartFunc(void* classPtr)
-{
-    CLanServer* ptr = (CLanServer*)classPtr;
-    return ptr->WorkProc(NULL);
-}
-
 unsigned int __stdcall CLanServer::WorkProc(void* arg)
 {
     int ret;
@@ -228,35 +217,37 @@ unsigned int __stdcall CLanServer::WorkProc(void* arg)
     SESSION* session;
     OVERLAPPEDEX* overlap = NULL;
 
+    CLanServer* THIS = (CLanServer*)arg;
+
     for (;;) {
-        ret = GetQueuedCompletionStatus(hIOCP, &bytes, (PULONG_PTR)&sessionID, (LPOVERLAPPED*)&overlap, INFINITE);
+        ret = GetQueuedCompletionStatus(THIS->hIOCP, &bytes, (PULONG_PTR)&sessionID, (LPOVERLAPPED*)&overlap, INFINITE);
 
         if (ret == false) {
-            lastError = WSAGetLastError();
+            THIS->lastError = WSAGetLastError();
         }
 
         if (overlap == NULL) {
             continue;
         }
 
-        session = FindSession(sessionID);
+        session = THIS->FindSession(sessionID);
         //recvd
         if (overlap->type == 0) {
             session->recvQ.MoveRear(bytes);
-            RecvProc(session);
+            THIS->RecvProc(session);
         }
         //sent
         if (overlap->type == 1) {
             //session->sendQ.MoveFront(bytes);
             InterlockedExchange8((char*)&session->isSending, 0);
-            SendPost(session);
+            THIS->SendPost(session);
         }
 
         ioCnt = InterlockedDecrement(&session->ioCnt);
         ReleaseSRWLockExclusive(&session->sessionLock);
 
         if (ioCnt == 0) {
-            ReleaseSession(sessionID, session);
+            THIS->ReleaseSession(sessionID, session);
         }
     }
 
@@ -269,14 +260,16 @@ unsigned int __stdcall CLanServer::AcceptProc(void* arg)
     SOCKET sock;
     WCHAR IP[16];
 
-    while(isServerOn) {
-        sock = accept(listenSock, (sockaddr*)&addr, NULL);
+    CLanServer* THIS = (CLanServer*)arg;
+
+    while(THIS->isServerOn) {
+        sock = accept(THIS->listenSock, (sockaddr*)&addr, NULL);
         if (sock == INVALID_SOCKET) {
             continue;
         }
 
         InetNtop(AF_INET, &addr.sin_addr, IP, 16);
-        if (MakeSession(g_sessionID++, IP, sock) == false) {
+        if (THIS->MakeSession(g_sessionID++, IP, sock) == false) {
             continue;
         }
     }

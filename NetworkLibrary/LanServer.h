@@ -1,4 +1,7 @@
 #pragma once
+struct SESSION;
+class CPacket;
+
 class CLanServer
 {
 public:
@@ -24,32 +27,6 @@ public:
 	virtual void OnError(int error, WCHAR* msg) = 0;
 
 private:
-	struct OVERLAPPEDEX {
-		OVERLAPPED overlap;
-		WORD type;
-	};
-
-	struct SESSION {
-		OVERLAPPEDEX recvOver;
-		OVERLAPPEDEX sendOver;
-		DWORD ioCnt;
-		bool isSending;
-		SRWLOCK sessionLock;
-		CRingBuffer recvQ;
-		CRingBuffer sendQ;
-		DWORD64 sessionID;
-
-		//monitor
-		DWORD sendCnt; // << 보낸 메세지수 확보
-
-		//readonly
-		SOCKET sock;
-		WCHAR IP[16];
-	};
-
-	struct NET_HEADER {
-		WORD len;
-	};
 
 private:
 	bool NetInit(WCHAR* IP, DWORD port, bool isNagle);
@@ -62,10 +39,8 @@ private:
 	bool	MakeSession(DWORD64 sessionID, WCHAR* IP, SOCKET sock);
 	void	ReleaseSession(DWORD64 sessionID, SESSION* session);
 
-	static unsigned int _stdcall AcceptStartFunc(void* classPtr);
-	static unsigned int _stdcall WorkStartFunc(void* classPtr);
-	unsigned int __stdcall WorkProc(void* arg);
-	unsigned int __stdcall AcceptProc(void* arg);
+	static unsigned int __stdcall WorkProc(void* arg);
+	static unsigned int __stdcall AcceptProc(void* arg);
 	void RecvProc(SESSION* session);
 	bool RecvPost(SESSION* session);
 	bool SendPost(SESSION* session);

@@ -155,6 +155,7 @@
   <ItemGroup>
     <ClInclude Include="framework.h" />
     <ClInclude Include="LanClient.h" />
+    <ClInclude Include="LanCommon.h" />
     <ClInclude Include="LanServer.h" />
     <ClInclude Include="Lock.h" />
     <ClInclude Include="Logging.h" />
