@@ -159,6 +159,7 @@
     <ClInclude Include="LanServer.h" />
     <ClInclude Include="Lock.h" />
     <ClInclude Include="Logging.h" />
+    <ClInclude Include="MemoryPool.h" />
     <ClInclude Include="NetClient.h" />
     <ClInclude Include="NetServer.h" />
     <ClInclude Include="pch.h" />
@@ -170,6 +171,7 @@
     <ClCompile Include="LanServer.cpp" />
     <ClCompile Include="Lock.cpp" />
     <ClCompile Include="Logging.cpp" />
+    <ClCompile Include="MemoryPool.cpp" />
     <ClCompile Include="NetClient.cpp" />
     <ClCompile Include="NetServer.cpp" />
     <ClCompile Include="NetworkLibrary.cpp" />

@@ -30,9 +30,12 @@ int CLanServer::GetSessionCount()
     return sessionCnt;
 }
 
+//동기 처리되는 경우 IO카운트가 안맞을 수 있으므로 동기 처리시 바로 IO카운트 제거할 것
 bool CLanServer::Disconnect(DWORD64 sessionID)
 {
-    
+    SESSION* session = FindSession(sessionID);
+    CancelIoEx((HANDLE)session->sock, (LPOVERLAPPED)&session->recvOver);
+    CancelIoEx((HANDLE)session->sock, (LPOVERLAPPED)&session->sendOver);
     return false;
 }
 
