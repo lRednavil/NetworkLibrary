@@ -32,8 +32,7 @@ int CLanServer::GetSessionCount()
 bool CLanServer::Disconnect(DWORD64 sessionID)
 {
     SESSION* session = FindSession(sessionID);
-    CancelIoEx((HANDLE)session->sock, (LPOVERLAPPED)&session->recvOver);
-    CancelIoEx((HANDLE)session->sock, (LPOVERLAPPED)&session->sendOver);
+    CancelIoEx((HANDLE)session->sock, NULL);
     return false;
 }
 
