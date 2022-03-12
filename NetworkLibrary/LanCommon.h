@@ -1,5 +1,6 @@
 #pragma once
-#include "pch.h"
+
+class CMemoryPool;
 
 struct OVERLAPPEDEX {
 	OVERLAPPED overlap;
@@ -27,3 +28,5 @@ struct SESSION {
 struct NET_HEADER {
 	WORD len;
 };
+
+extern CMemoryPool g_LanPacketPool;

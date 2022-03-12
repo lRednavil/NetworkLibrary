@@ -168,6 +168,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="LanClient.cpp" />
+    <ClCompile Include="LanCommon.cpp" />
     <ClCompile Include="LanServer.cpp" />
     <ClCompile Include="Lock.cpp" />
     <ClCompile Include="Logging.cpp" />

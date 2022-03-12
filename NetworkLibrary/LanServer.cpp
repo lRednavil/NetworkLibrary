@@ -2,8 +2,6 @@
 #include "LanServer.h"
 #include "LanCommon.h"
 
-DWORD64 g_sessionID = 0;
-
 bool CLanServer::Start(WCHAR* IP, DWORD port, DWORD createThreads, DWORD runningThreads, bool isNagle, DWORD maxConnect)
 {
     if (NetInit(IP, port, isNagle) == false) {
@@ -272,7 +270,7 @@ unsigned int __stdcall CLanServer::AcceptProc(void* arg)
         }
 
         InetNtop(AF_INET, &addr.sin_addr, IP, 16);
-        if (THIS->MakeSession(g_sessionID++, IP, sock) == false) {
+        if (THIS->MakeSession(THIS->g_sessionID++, IP, sock) == false) {
             continue;
         }
     }
@@ -287,13 +285,14 @@ void CLanServer::RecvProc(SESSION* session)
     NET_HEADER netHeader;
     DWORD len;
     CRingBuffer* recvQ = &session->recvQ;
+    CPacket* packet = NULL;
 
     for (;;) {
-        CPacket* packet = new CPacket();
+        packet = g_LanPacketPool.Alloc(packet);
         len = recvQ->GetUsedSize();
         //길이 판별
         if (sizeof(netHeader) > len) {
-            delete packet;
+            g_LanPacketPool.Free(packet);
             break;
         }
 
@@ -302,7 +301,7 @@ void CLanServer::RecvProc(SESSION* session)
 
         //길이 판별
         if (sizeof(netHeader) + netHeader.len > len) {
-            delete packet;
+            g_LanPacketPool.Free(packet);
             break;
         }
 

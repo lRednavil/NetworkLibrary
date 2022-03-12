@@ -6,6 +6,7 @@ extern short _rearCheckSum;
 #define DATA_INDEX 10
 //데이터 최소단위 64
 #define DATA_DEFAULT 64
+#define rearCheckSum 0x2835
 //default 생성자 옵션 || 최소단위 64byte, placement new 사용 X
 //최소단위 변경시 2의 배수로 선언할 것
 class CMemoryPool
@@ -190,7 +191,7 @@ inline bool CMemoryPool::Free(DATA* pData)
 		abort();
 	}
 
-	if (*rearCheck != _rearCheckSum) {
+	if (*rearCheck != rearCheckSum) {
 		abort();
 	}
 
