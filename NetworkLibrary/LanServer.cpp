@@ -12,7 +12,7 @@ bool CLanServer::Start(WCHAR* IP, DWORD port, DWORD createThreads, DWORD running
         return false;
     }
 
-    //sessionArr = new SESSION[maxConnect];
+    sessionArr = new SESSION[maxConnect];
     InitializeSRWLock(&sessionMapLock);
     isServerOn = true;
 

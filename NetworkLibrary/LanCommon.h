@@ -29,4 +29,33 @@ struct NET_HEADER {
 	WORD len;
 };
 
+union SESSIONID {
+	WORD index;
+	union ID {
+		WORD high;
+		DWORD low;
+	};
+};
+
+template <class DATA>
+class CStack {
+public:
+	CStack<DATA>(int size) : size(size) {
+		arr = new DATA[size];
+	}
+	~CStack<DATA>() {
+		delete[] arr;
+	}
+
+public:
+	bool Push(DATA val);
+	bool Pop(DATA val);
+
+private:
+	DATA* arr;
+	int size;
+
+	int top = 0;
+};
+
 extern CMemoryPool g_LanPacketPool;
