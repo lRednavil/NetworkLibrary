@@ -30,10 +30,12 @@ struct NET_HEADER {
 };
 
 union SESSIONID {
-	WORD index;
-	union ID {
-		WORD high;
-		DWORD low;
+	struct {
+		WORD index;
+		struct ID {
+			WORD high;
+			DWORD low;
+		};
 	};
 };
 

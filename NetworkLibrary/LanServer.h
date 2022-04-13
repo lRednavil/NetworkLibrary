@@ -46,7 +46,7 @@ private:
 
 private:
 	//SESSION* sessionArr;
-	//std::unordered_map<DWORD64, SESSION*> sessionMap; //나중에 삭제
+	std::unordered_map<DWORD64, SESSION*> sessionMap; //나중에 삭제
 	SESSION* sessionArr;
 	
 
