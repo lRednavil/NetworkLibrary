@@ -8,6 +8,8 @@ CMemoryPool g_LanServerPacketPool;
 #define TIMER_THREAD 1
 
 #define SESSION_MASK 0x00000fffffffffff
+#define MASK_SHIFT 45
+#define RELEASE_FLAG 0x7000000000000000
 
 bool CLanServer::Start(WCHAR* IP, DWORD port, DWORD createThreads, DWORD runningThreads, bool isNagle, DWORD maxConnect)
 {
@@ -45,18 +47,26 @@ int CLanServer::GetSessionCount()
 //동기 처리되는 경우 IO카운트가 안맞을 수 있으므로 동기 처리시 바로 IO카운트 제거할 것
 bool CLanServer::Disconnect(DWORD64 sessionID)
 {
-    SESSION* session = FindSession(sessionID);
-    CancelIoEx((HANDLE)session->sock, NULL);
+    SESSION* session = AcquireSession(sessionID);
+    if (session != NULL) {
+        CancelIoEx((HANDLE)session->sock, NULL);
+        LoseSession(session);
+        return true;
+    }
+
     return false;
 }
 
 bool CLanServer::SendPacket(DWORD64 sessionID, CPacket* packet)
 {
-    SESSION* session = FindSession(sessionID);
+    SESSION* session = AcquireSession(sessionID);
 
-    session->sendQ.Enqueue(packet);
-
-    SendPost(session);
+    if (session != NULL) {
+        session->sendQ.Enqueue(packet);
+        SendPost(session);
+        LoseSession(session);
+        return true;
+    }
 
     return false;
 }
@@ -146,22 +156,51 @@ bool CLanServer::ThreadInit(const DWORD createThreads, const DWORD runningThread
     if (hIOCP == NULL) {
         return false;
     }
-    _LOG(LOG_LEVEL_SYSTEM, L"IOCP Created");
+    _LOG(LOG_LEVEL_SYSTEM, L"LanServer IOCP Created");
 
     for (cnt = 0; cnt <= createThreads; cnt++) {
         if (hThreads[cnt] == INVALID_HANDLE_VALUE) {
+            OnError(-1, L"Create Thread Failed");
             return false;
         }
     }
 
-   
-
     return true;
+}
+
+SESSION* CLanServer::AcquireSession(DWORD64 sessionID)
+{
+    //find
+    int sessionID_high = sessionID >> MASK_SHIFT;
+    SESSION* session = &sessionArr[sessionID_high];
+
+    //add IO
+    InterlockedIncrement(&session->ioCnt);
+
+    if (session->ioCnt & RELEASE_FLAG) {
+        LoseSession(session);
+        return NULL;
+    }
+
+    //같은 세션인지 재확인
+    if (session->sessionID != sessionID) {
+        LoseSession(session);
+        return NULL;
+    }
+
+    return session;
+}
+
+void CLanServer::LoseSession(SESSION* session)
+{
+    if (InterlockedDecrement(&session->ioCnt) == 0) {
+        ReleaseSession(session);
+    }
 }
 
 SESSION* CLanServer::FindSession(DWORD64 sessionID)
 {
-    int sessionID_high = sessionID >> 45; 
+    int sessionID_high = sessionID >> MASK_SHIFT;
 
     return &sessionArr[sessionID_high];
 }
@@ -180,13 +219,13 @@ bool CLanServer::MakeSession(WCHAR* IP, SOCKET sock)
         return false;
     }
     sessionID = (totalAccept & SESSION_MASK);
-    sessionID |= ((__int64)sessionID_high << 45);
+    sessionID |= ((__int64)sessionID_high << MASK_SHIFT);
 
     session = &sessionArr[sessionID_high];
 
     session->sock = sock;
     session->isSending = false;
-    session->ioCnt = 0;
+    session->ioCnt &= ~RELEASE_FLAG;
 
     wmemmove_s(session->IP, 16, IP, 16);
     session->sessionID = sessionID;
@@ -203,17 +242,26 @@ bool CLanServer::MakeSession(WCHAR* IP, SOCKET sock)
         return false;
     }
 
-    sessionCnt++;
+    InterlockedIncrement(&sessionCnt);
     //recv start
+    InterlockedIncrement(&session->ioCnt);
     return RecvPost(session);
 }
 
-void CLanServer::ReleaseSession(DWORD64 sessionID, SESSION* session)
+void CLanServer::ReleaseSession(SESSION* session)
 {
+    //cas로 플래그 전환
+    if (InterlockedCompareExchange64((long long*)&session->ioCnt, RELEASE_FLAG, 0) != 0) {
+        return;
+    }
+
+
     SOCKET sock = session->sock;
 
     //delete에서 풀로 전환가자
     closesocket(sock);
+
+    sessionStack.Push(session->sessionID >> MASK_SHIFT);
 }
 
 unsigned int __stdcall CLanServer::WorkProc(void* arg)
@@ -240,25 +288,25 @@ unsigned int __stdcall CLanServer::WorkProc(void* arg)
             continue;
         }
 
-        session = server->FindSession(sessionID);
-        //recvd
-        if (overlap->type == 0) {
-            session->recvQ.MoveRear(bytes);
-            server->RecvProc(session);
-        }
-        //sent
-        if (overlap->type == 1) {
-            while (session->sendCnt) {
-                --session->sendCnt;
-                if(session->sendBuf[session->sendCnt]->SubRef() == 0)
-                g_LanServerPacketPool.Free(session->sendBuf[session->sendCnt]);
+        session = server->AcquireSession(sessionID);
+        
+        if (session != NULL) {
+            //recvd
+            if (overlap->type == 0) {
+                session->recvQ.MoveRear(bytes);
+                server->RecvProc(session);
             }
-            InterlockedExchange8((char*)&session->isSending, 0);
-            server->SendPost(session);
-        }
-        ioCnt = InterlockedDecrement(&session->ioCnt);
-        if (ioCnt == 0) {
-            server->ReleaseSession(sessionID, session);
+            //sent
+            if (overlap->type == 1) {
+                while (session->sendCnt) {
+                    --session->sendCnt;
+                    if (session->sendBuf[session->sendCnt]->SubRef() == 0)
+                        g_LanServerPacketPool.Free(session->sendBuf[session->sendCnt]);
+                }
+                InterlockedExchange8((char*)&session->isSending, 0);
+                server->SendPost(session);
+            }
+            server->LoseSession(session);
         }
     }
 
@@ -359,7 +407,6 @@ bool CLanServer::RecvPost(SESSION* session)
     pBuf[0] = { len, recvQ->GetRearBufferPtr() };
     pBuf[1] = { recvQ->GetFreeSize() - len, recvQ->GetBufferPtr() };
 
-    InterlockedIncrement(&session->ioCnt);
     ret = WSARecv(session->sock, pBuf, 2, NULL, &flag, (LPWSAOVERLAPPED)&session->recvOver, NULL);
 
     if (ret == SOCKET_ERROR) {
@@ -369,7 +416,7 @@ bool CLanServer::RecvPost(SESSION* session)
             //good
         }
         else {
-            InterlockedDecrement(&session->ioCnt);
+            LoseSession(session);
             return false;
         }
     }
@@ -415,7 +462,6 @@ bool CLanServer::SendPost(SESSION* session)
         pBuf[cnt].len = packet->GetDataSize();
     }
 
-    InterlockedIncrement(&session->ioCnt);
     ret = WSASend(session->sock, pBuf, 100, NULL, 0, (LPWSAOVERLAPPED)&session->sendOver, NULL);
 
     if (ret == SOCKET_ERROR) {
@@ -425,7 +471,7 @@ bool CLanServer::SendPost(SESSION* session)
             //good
         }
         else {
-            InterlockedDecrement(&session->ioCnt);
+            LoseSession(session);
             return false;
         }
     }

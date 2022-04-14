@@ -11,7 +11,7 @@ struct SESSION {
 	OVERLAPPEDEX recvOver;
 	OVERLAPPEDEX sendOver;
 	//session refCnt의 역할
-	DWORD ioCnt;
+	DWORD64 ioCnt;
 	bool isSending;
 	SRWLOCK sessionLock;
 	//네트워크 메세지용 버퍼들
@@ -27,20 +27,14 @@ struct SESSION {
 	//readonly
 	SOCKET sock;
 	WCHAR IP[16];
+
+	SESSION() {
+		ioCnt = 0;
+	}
 };
 
 struct NET_HEADER {
 	WORD len;
-};
-
-union SESSIONID {
-	struct {
-		WORD index;
-		struct ID {
-			WORD high;
-			DWORD low;
-		};
-	};
 };
 
 template <class DATA>

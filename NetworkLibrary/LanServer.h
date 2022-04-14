@@ -31,9 +31,17 @@ private:
 	void NetClose();
 	void ThreadClose();
 
+	//return NULL for fail
+	//FindSession + Check Flag + Session 재확인
+	//반드시 LoseSession과 페어를 맞출 것
+	SESSION* AcquireSession(DWORD64 sessionID);
+	//ioCnt 차감 이후 Release 세션 진입
+	//반드시 AcquireSession 이나 ioCnt 증가 후에 사용
+	void LoseSession(SESSION* session);
+
 	SESSION* FindSession(DWORD64 sessionID);
 	bool	MakeSession(WCHAR* IP, SOCKET sock);
-	void	ReleaseSession(DWORD64 sessionID, SESSION* session);
+	void	ReleaseSession(SESSION* session);
 
 	static unsigned int __stdcall WorkProc(void* arg);
 	static unsigned int __stdcall AcceptProc(void* arg);
