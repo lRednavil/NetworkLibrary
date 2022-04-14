@@ -7,6 +7,8 @@ CMemoryPool g_LanServerPacketPool;
 #define ACCEPT_THREAD 1
 #define TIMER_THREAD 1
 
+#define SESSION_MASK 0x00000fffffffffff
+
 bool CLanServer::Start(WCHAR* IP, DWORD port, DWORD createThreads, DWORD runningThreads, bool isNagle, DWORD maxConnect)
 {
     if (NetInit(IP, port, isNagle) == false) {
@@ -15,9 +17,11 @@ bool CLanServer::Start(WCHAR* IP, DWORD port, DWORD createThreads, DWORD running
 
     isServerOn = true;
     sessionArr = new SESSION[maxConnect];
+
+    totalAccept = 0;
    
-    while (--maxConnect >= 0) {
-        sessionStack.Push(maxConnect);
+    for (int cnt = 0; cnt < maxConnect; cnt++) {
+        sessionStack.Push(cnt);
     }
 
     if (ThreadInit(createThreads, runningThreads) == false) {
@@ -157,29 +161,28 @@ bool CLanServer::ThreadInit(const DWORD createThreads, const DWORD runningThread
 
 SESSION* CLanServer::FindSession(DWORD64 sessionID)
 {
-    CLock _lock(&sessionMapLock, 0);
+    int sessionID_high = sessionID >> 45; 
 
-    if (sessionMap.find(sessionID) == sessionMap.end()) {
-        return NULL;
-    }
-    
-    return sessionMap[sessionID];
+    return &sessionArr[sessionID_high];
 }
 
-bool CLanServer::MakeSession(DWORD64 sessionID, WCHAR* IP, SOCKET sock)
+bool CLanServer::MakeSession(WCHAR* IP, SOCKET sock)
 {
-    DWORD64 arrIdx;
-    SESSION* session = new SESSION;
+    int sessionID_high;
+    DWORD64 sessionID;
+    SESSION* session;
     //풀로 할당
     //iocp var
     HANDLE h;
 
-    //recv part
-    int ret;
-    int err;
-    WSABUF pBuf[2];
-    DWORD flag = 0;
-    DWORD len;
+    if (sessionStack.Pop(&sessionID_high) == false) {
+        OnError(-1, L"All Session is in Use");
+        return false;
+    }
+    sessionID = (totalAccept & SESSION_MASK);
+    sessionID |= ((__int64)sessionID_high << 45);
+
+    session = &sessionArr[sessionID_high];
 
     session->sock = sock;
     session->isSending = false;
@@ -192,9 +195,6 @@ bool CLanServer::MakeSession(DWORD64 sessionID, WCHAR* IP, SOCKET sock)
     session->recvOver.type = 0;
     ZeroMemory(&session->sendOver, sizeof(session->sendOver));
     session->sendOver.type = 1;
-
-    CLock Lock(&sessionMapLock, 1);
-    sessionMap.insert({ sessionID, session });
 
     //iocp match
     h = CreateIoCompletionPort((HANDLE)session->sock, hIOCP, (ULONG_PTR)sessionID, 0);
@@ -210,10 +210,7 @@ bool CLanServer::MakeSession(DWORD64 sessionID, WCHAR* IP, SOCKET sock)
 
 void CLanServer::ReleaseSession(DWORD64 sessionID, SESSION* session)
 {
-    CLock Lock(&sessionMapLock, 1);
     SOCKET sock = session->sock;
-
-    sessionMap.erase(sessionID);
 
     //delete에서 풀로 전환가자
     closesocket(sock);
@@ -278,6 +275,7 @@ unsigned int __stdcall CLanServer::AcceptProc(void* arg)
 
     while(server->isServerOn) {
         sock = accept(server->listenSock, (sockaddr*)&addr, NULL);
+        ++server->totalAccept;
         if (sock == INVALID_SOCKET) {
             continue;
         }
@@ -288,7 +286,7 @@ unsigned int __stdcall CLanServer::AcceptProc(void* arg)
             continue;
         }
 
-        if (server->MakeSession(server->totalSession++, IP, sock) == false) {
+        if (server->MakeSession(IP, sock) == false) {
             continue;
         }
 

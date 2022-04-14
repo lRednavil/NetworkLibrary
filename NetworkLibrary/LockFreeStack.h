@@ -42,7 +42,6 @@ private:
 
 	unsigned int size;
 	unsigned long long pushCnt = 0;
-	unsigned long long realPop = 0;
 };
 
 template<class DATA>
@@ -56,10 +55,10 @@ template<class DATA>
 inline CLockFreeStack<DATA>::~CLockFreeStack()
 {
 	STACK_NODE<DATA>* nxt;
-	while (top) {
-		nxt = top->next;
-		memPool.Free(top);
-		top = nxt;
+	while (topNode) {
+		nxt = topNode->next;
+		memPool.Free(topNode);
+		topNode = nxt;
 	}
 }
 

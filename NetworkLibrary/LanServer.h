@@ -32,7 +32,7 @@ private:
 	void ThreadClose();
 
 	SESSION* FindSession(DWORD64 sessionID);
-	bool	MakeSession(DWORD64 sessionID, WCHAR* IP, SOCKET sock);
+	bool	MakeSession(WCHAR* IP, SOCKET sock);
 	void	ReleaseSession(DWORD64 sessionID, SESSION* session);
 
 	static unsigned int __stdcall WorkProc(void* arg);
@@ -47,7 +47,7 @@ private:
 	//stack for session index
 	CLockFreeStack<int> sessionStack;
 
-	DWORD64 totalSession = 0;
+	DWORD64 totalAccept;
 	int lastError;
 
 	//monitor
