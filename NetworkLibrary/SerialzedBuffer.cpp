@@ -208,12 +208,12 @@ int CPacket::PutData(char* chpSrc, int iSrcSize)
     return ret;
 }
 
-void CPacket::AddRef()
+void CPacket::AddRef(int addVal)
 {
-    InterlockedIncrement16(&refCnt);
+    InterlockedAdd(&refCnt, addVal);
 }
 
-void CPacket::SubRef()
+short CPacket::SubRef()
 {
-    InterlockedDecrement16(&refCnt);
+    return InterlockedDecrement(&refCnt);
 }

@@ -219,8 +219,8 @@ public:
 	/// <summary>
 	/// refCnt용 함수들
 	/// </summary>
-	void	AddRef();
-	void	SubRef();
+	void	AddRef(int addVal);
+	short	SubRef();
 
 protected:
 
@@ -231,7 +231,7 @@ protected:
 	int _head = 0;
 	int _rear = 0;
 
-	short refCnt = 0;
+	long refCnt = 0;
 };
 
 

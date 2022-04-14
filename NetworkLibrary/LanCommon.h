@@ -17,6 +17,8 @@ struct SESSION {
 	CRingBuffer sendQ;
 	DWORD64 sessionID;
 
+	//send 후 해제용
+	CPacket* sendBuf[100];
 	//monitor
 	DWORD sendCnt; // << 보낸 메세지수 확보
 

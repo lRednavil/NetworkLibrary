@@ -244,13 +244,15 @@ unsigned int __stdcall CLanServer::WorkProc(void* arg)
         }
         //sent
         if (overlap->type == 1) {
-            //session->sendQ.MoveFront(bytes);
+            while (session->sendCnt) {
+                --session->sendCnt;
+                if(session->sendBuf[session->sendCnt]->SubRef() == 0)
+                g_LanServerPacketPool.Free(session->sendBuf[session->sendCnt]);
+            }
             InterlockedExchange8((char*)&session->isSending, 0);
             server->SendPost(session);
         }
-
         ioCnt = InterlockedDecrement(&session->ioCnt);
-
         if (ioCnt == 0) {
             server->ReleaseSession(sessionID, session);
         }
@@ -300,10 +302,15 @@ void CLanServer::RecvProc(SESSION* session)
 
     for (;;) {
         packet = g_LanServerPacketPool.Alloc(packet);
+        packet->AddRef(1);
+        packet->Clear();
+
         len = recvQ->GetUsedSize();
         //길이 판별
         if (sizeof(netHeader) > len) {
-            g_LanServerPacketPool.Free(packet);
+            if (packet->SubRef() == 0) {
+                g_LanServerPacketPool.Free(packet);
+            }
             break;
         }
 
@@ -312,7 +319,9 @@ void CLanServer::RecvProc(SESSION* session)
 
         //길이 판별
         if (sizeof(netHeader) + netHeader.len > len) {
-            g_LanServerPacketPool.Free(packet);
+            if (packet->SubRef() == 0) {
+                g_LanServerPacketPool.Free(packet);
+            }
             break;
         }
 
@@ -395,10 +404,16 @@ bool CLanServer::SendPost(SESSION* session)
 
     session->sendCnt = usedLen / sizeof(void*);
 
+    if (session->sendCnt == 0) {
+        InterlockedExchange8((char*)&session->isSending, 1);
+        return false;
+    }
+
     ZeroMemory(pBuf, sizeof(WSABUF) * 100);
 
     for (WORD cnt = 0; cnt < session->sendCnt; cnt++) {
         sendQ->Dequeue((char*)&packet, sizeof(void*));
+        session->sendBuf[cnt] = packet;
         pBuf[cnt].buf = packet->GetBufferPtr();
         pBuf[cnt].len = packet->GetDataSize();
     }
