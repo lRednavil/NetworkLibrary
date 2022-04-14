@@ -16,8 +16,8 @@ public:
 	virtual bool OnConnectionRequest(WCHAR* IP, DWORD Port) = 0; //< accept 직후
 	//return false; 시 클라이언트 거부.
 	//return true; 시 접속 허용
-	virtual void OnClientJoin() = 0;
-	virtual void OnClientLeave() = 0;
+	virtual bool OnClientJoin() = 0;
+	virtual bool OnClientLeave() = 0;
 
 	virtual void OnRecv(DWORD64 sessionID, CPacket* packet) = 0;
 

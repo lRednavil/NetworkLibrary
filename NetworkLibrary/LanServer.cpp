@@ -127,17 +127,20 @@ bool CLanServer::ThreadInit(const DWORD createThreads, const DWORD runningThread
         hThreads[cnt] = (HANDLE)_beginthreadex(NULL, 0, CLanServer::WorkProc, this, NULL, NULL);
     }
 
-    hIOCP = CreateIoCompletionPort(NULL, NULL, NULL, runningThreads);
+    hIOCP = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, NULL, runningThreads);
 
-    if (hIOCP == INVALID_HANDLE_VALUE) {
+    if (hIOCP == NULL) {
         return false;
     }
+    _LOG(LOG_LEVEL_SYSTEM, L"IOCP Created");
 
     for (cnt = 0; cnt <= createThreads; cnt++) {
         if (hThreads[cnt] == INVALID_HANDLE_VALUE) {
             return false;
         }
     }
+
+   
 
     return true;
 }
@@ -217,37 +220,37 @@ unsigned int __stdcall CLanServer::WorkProc(void* arg)
     SESSION* session;
     OVERLAPPEDEX* overlap = NULL;
 
-    CLanServer* THIS = (CLanServer*)arg;
+    CLanServer* server = (CLanServer*)arg;
 
     for (;;) {
-        ret = GetQueuedCompletionStatus(THIS->hIOCP, &bytes, (PULONG_PTR)&sessionID, (LPOVERLAPPED*)&overlap, INFINITE);
+        ret = GetQueuedCompletionStatus(server->hIOCP, &bytes, (PULONG_PTR)&sessionID, (LPOVERLAPPED*)&overlap, INFINITE);
 
         if (ret == false) {
-            THIS->lastError = WSAGetLastError();
+            server->lastError = WSAGetLastError();
         }
 
         if (overlap == NULL) {
             continue;
         }
 
-        session = THIS->FindSession(sessionID);
+        session = server->FindSession(sessionID);
         //recvd
         if (overlap->type == 0) {
             session->recvQ.MoveRear(bytes);
-            THIS->RecvProc(session);
+            server->RecvProc(session);
         }
         //sent
         if (overlap->type == 1) {
             //session->sendQ.MoveFront(bytes);
             InterlockedExchange8((char*)&session->isSending, 0);
-            THIS->SendPost(session);
+            server->SendPost(session);
         }
 
         ioCnt = InterlockedDecrement(&session->ioCnt);
         ReleaseSRWLockExclusive(&session->sessionLock);
 
         if (ioCnt == 0) {
-            THIS->ReleaseSession(sessionID, session);
+            server->ReleaseSession(sessionID, session);
         }
     }
 
@@ -260,16 +263,16 @@ unsigned int __stdcall CLanServer::AcceptProc(void* arg)
     SOCKET sock;
     WCHAR IP[16];
 
-    CLanServer* THIS = (CLanServer*)arg;
+    CLanServer* server = (CLanServer*)arg;
 
-    while(THIS->isServerOn) {
-        sock = accept(THIS->listenSock, (sockaddr*)&addr, NULL);
+    while(server->isServerOn) {
+        sock = accept(server->listenSock, (sockaddr*)&addr, NULL);
         if (sock == INVALID_SOCKET) {
             continue;
         }
 
         InetNtop(AF_INET, &addr.sin_addr, IP, 16);
-        if (THIS->MakeSession(THIS->g_sessionID++, IP, sock) == false) {
+        if (server->MakeSession(server->g_sessionID++, IP, sock) == false) {
             continue;
         }
     }
