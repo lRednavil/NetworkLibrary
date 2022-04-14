@@ -47,7 +47,7 @@ bool CLanServer::SendPacket(DWORD64 sessionID, CPacket* packet)
 {
     SESSION* session = FindSession(sessionID);
 
-    session->sendQ.Enqueue((char*)&packet, sizeof(void*));
+    session->sendQ.Enqueue(packet);
 
     SendPost(session);
 
@@ -382,10 +382,9 @@ bool CLanServer::SendPost(SESSION* session)
 
     bool isPending;
 
-    CRingBuffer* sendQ;
+    CLockFreeQueue<CPacket*>* sendQ;
     CPacket* packet;
 
-    DWORD usedLen;
     WSABUF pBuf[100];
     
     isPending = InterlockedExchange8((char*)&session->isSending, 1);
@@ -394,25 +393,18 @@ bool CLanServer::SendPost(SESSION* session)
     }
 
     sendQ = &session->sendQ;
-    usedLen = sendQ->GetUsedSize();
     //0byte send시 iocp에 결과만 Enqueue, 실제 0바이트 송신 X
     // usedLen == 0 판별 중 Recv를 통한 SendPost에서 isPending Interlock 선 진입시 오류발생 이후에 send 요청 상실 >> 일부 패킷 소실의 버그
-    if (usedLen == 0) {
+    if (sendQ->GetSize() == 0) {
         InterlockedExchange8((char*)&session->isSending, 0);
         return false;
     }
 
-    session->sendCnt = usedLen / sizeof(void*);
-
-    if (session->sendCnt == 0) {
-        InterlockedExchange8((char*)&session->isSending, 1);
-        return false;
-    }
-
+    session->sendCnt = sendQ->GetSize();
     ZeroMemory(pBuf, sizeof(WSABUF) * 100);
 
     for (WORD cnt = 0; cnt < session->sendCnt; cnt++) {
-        sendQ->Dequeue((char*)&packet, sizeof(void*));
+        sendQ->Dequeue(&packet);
         session->sendBuf[cnt] = packet;
         pBuf[cnt].buf = packet->GetBufferPtr();
         pBuf[cnt].len = packet->GetDataSize();

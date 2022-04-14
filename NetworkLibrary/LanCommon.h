@@ -14,7 +14,7 @@ struct SESSION {
 	bool isSending;
 	SRWLOCK sessionLock;
 	CRingBuffer recvQ;
-	CRingBuffer sendQ;
+	CLockFreeQueue<CPacket*> sendQ;
 	DWORD64 sessionID;
 
 	//send 후 해제용
