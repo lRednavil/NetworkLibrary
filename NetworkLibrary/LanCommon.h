@@ -10,9 +10,11 @@ struct OVERLAPPEDEX {
 struct SESSION {
 	OVERLAPPEDEX recvOver;
 	OVERLAPPEDEX sendOver;
+	//session refCnt의 역할
 	DWORD ioCnt;
 	bool isSending;
 	SRWLOCK sessionLock;
+	//네트워크 메세지용 버퍼들
 	CRingBuffer recvQ;
 	CLockFreeQueue<CPacket*> sendQ;
 	DWORD64 sessionID;

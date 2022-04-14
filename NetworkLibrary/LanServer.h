@@ -25,10 +25,6 @@ public:
 	virtual void OnError(int error, const WCHAR* msg) = 0;
 
 private:
-	//CLanServer();
-	//~CLanServer();
-
-private:
 	bool NetInit(WCHAR* IP, DWORD port, bool isNagle);
 	bool ThreadInit(const DWORD createThreads, const DWORD runningThreads);
 
@@ -46,14 +42,13 @@ private:
 	bool SendPost(SESSION* session);
 
 private:
-	//SESSION* sessionArr;
-	std::unordered_map<DWORD64, SESSION*> sessionMap; //나중에 삭제
+	//array for session
 	SESSION* sessionArr;
-	
+	//stack for session index
+	CLockFreeStack<int> sessionStack;
 
-	DWORD64 g_sessionID = 0;
+	DWORD64 totalSession = 0;
 	int lastError;
-	SRWLOCK sessionMapLock;
 
 	//monitor
 	DWORD sessionCnt;

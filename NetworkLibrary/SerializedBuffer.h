@@ -220,7 +220,7 @@ public:
 	/// refCnt용 함수들
 	/// </summary>
 	void	AddRef(int addVal);
-	short	SubRef();
+	long	SubRef();
 
 protected:
 

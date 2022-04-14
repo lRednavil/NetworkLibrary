@@ -14,14 +14,17 @@ bool CLanServer::Start(WCHAR* IP, DWORD port, DWORD createThreads, DWORD running
     }
 
     isServerOn = true;
+    sessionArr = new SESSION[maxConnect];
+   
+    while (--maxConnect >= 0) {
+        sessionStack.Push(maxConnect);
+    }
 
     if (ThreadInit(createThreads, runningThreads) == false) {
         isServerOn = false;
+        sessionStack.~CLockFreeStack();
         return false;
     }
-
-    sessionArr = new SESSION[maxConnect];
-    InitializeSRWLock(&sessionMapLock);
 
     return true;
 }
@@ -165,6 +168,7 @@ SESSION* CLanServer::FindSession(DWORD64 sessionID)
 
 bool CLanServer::MakeSession(DWORD64 sessionID, WCHAR* IP, SOCKET sock)
 {
+    DWORD64 arrIdx;
     SESSION* session = new SESSION;
     //풀로 할당
     //iocp var
@@ -284,7 +288,7 @@ unsigned int __stdcall CLanServer::AcceptProc(void* arg)
             continue;
         }
 
-        if (server->MakeSession(server->g_sessionID++, IP, sock) == false) {
+        if (server->MakeSession(server->totalSession++, IP, sock) == false) {
             continue;
         }
 

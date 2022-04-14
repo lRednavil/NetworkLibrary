@@ -160,6 +160,7 @@
     <ClInclude Include="Lock.h" />
     <ClInclude Include="LockFreeMemoryPool.h" />
     <ClInclude Include="LockFreeQueue.h" />
+    <ClInclude Include="LockFreeStack.h" />
     <ClInclude Include="Logging.h" />
     <ClInclude Include="MemoryPool.h" />
     <ClInclude Include="NetClient.h" />
@@ -174,6 +175,7 @@
     <ClCompile Include="LanServer.cpp" />
     <ClCompile Include="Lock.cpp" />
     <ClCompile Include="LockFreeMemoryPool.cpp" />
+    <ClCompile Include="LockFreeStack.cpp" />
     <ClCompile Include="Logging.cpp" />
     <ClCompile Include="MemoryPool.cpp" />
     <ClCompile Include="NetClient.cpp" />

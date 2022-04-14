@@ -213,7 +213,7 @@ void CPacket::AddRef(int addVal)
     InterlockedAdd(&refCnt, addVal);
 }
 
-short CPacket::SubRef()
+long CPacket::SubRef()
 {
     return InterlockedDecrement(&refCnt);
 }
