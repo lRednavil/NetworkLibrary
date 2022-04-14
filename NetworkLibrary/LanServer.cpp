@@ -2,6 +2,8 @@
 #include "LanServer.h"
 #include "LanCommon.h"
 
+CMemoryPool g_LanServerPacketPool;
+
 bool CLanServer::Start(WCHAR* IP, DWORD port, DWORD createThreads, DWORD runningThreads, bool isNagle, DWORD maxConnect)
 {
     if (NetInit(IP, port, isNagle) == false) {
@@ -152,7 +154,7 @@ SESSION* CLanServer::FindSession(DWORD64 sessionID)
     if (sessionMap.find(sessionID) == sessionMap.end()) {
         return NULL;
     }
-
+    
     return sessionMap[sessionID];
 }
 
@@ -179,8 +181,6 @@ bool CLanServer::MakeSession(DWORD64 sessionID, WCHAR* IP, SOCKET sock)
     ZeroMemory(&session->sendOver, sizeof(session->sendOver));
     session->sendOver.type = 1;
 
-    InitializeSRWLock(&session->sessionLock);
-
     CLock Lock(&sessionMapLock, 1);
     sessionMap.insert({ sessionID, session });
 
@@ -203,9 +203,6 @@ void CLanServer::ReleaseSession(DWORD64 sessionID, SESSION* session)
 
     sessionMap.erase(sessionID);
 
-    AcquireSRWLockExclusive(&session->sessionLock);
-    ReleaseSRWLockExclusive(&session->sessionLock);
-
     //delete에서 풀로 전환가자
     closesocket(sock);
 }
@@ -227,6 +224,7 @@ unsigned int __stdcall CLanServer::WorkProc(void* arg)
 
         if (ret == false) {
             server->lastError = WSAGetLastError();
+            server->OnError(server->lastError, L"GQCS return false");
         }
 
         if (overlap == NULL) {
@@ -247,7 +245,6 @@ unsigned int __stdcall CLanServer::WorkProc(void* arg)
         }
 
         ioCnt = InterlockedDecrement(&session->ioCnt);
-        ReleaseSRWLockExclusive(&session->sessionLock);
 
         if (ioCnt == 0) {
             server->ReleaseSession(sessionID, session);
@@ -272,9 +269,16 @@ unsigned int __stdcall CLanServer::AcceptProc(void* arg)
         }
 
         InetNtop(AF_INET, &addr.sin_addr, IP, 16);
+        
+        if (server->OnConnectionRequest(IP, ntohs(addr.sin_port)) == false) {
+            continue;
+        }
+
         if (server->MakeSession(server->g_sessionID++, IP, sock) == false) {
             continue;
         }
+
+        server->OnClientJoin();
     }
 
     return 0;
@@ -290,11 +294,11 @@ void CLanServer::RecvProc(SESSION* session)
     CPacket* packet = NULL;
 
     for (;;) {
-        packet = g_LanPacketPool.Alloc(packet);
+        packet = g_LanServerPacketPool.Alloc(packet);
         len = recvQ->GetUsedSize();
         //길이 판별
         if (sizeof(netHeader) > len) {
-            g_LanPacketPool.Free(packet);
+            g_LanServerPacketPool.Free(packet);
             break;
         }
 
@@ -303,7 +307,7 @@ void CLanServer::RecvProc(SESSION* session)
 
         //길이 판별
         if (sizeof(netHeader) + netHeader.len > len) {
-            g_LanPacketPool.Free(packet);
+            g_LanServerPacketPool.Free(packet);
             break;
         }
 

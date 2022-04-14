@@ -19,9 +19,10 @@ public:
 	virtual bool OnClientJoin() = 0;
 	virtual bool OnClientLeave() = 0;
 
+	//message 분석 역할
 	virtual void OnRecv(DWORD64 sessionID, CPacket* packet) = 0;
 
-	virtual void OnError(int error, WCHAR* msg) = 0;
+	virtual void OnError(int error, const WCHAR* msg) = 0;
 
 private:
 	//CLanServer();
@@ -58,6 +59,7 @@ private:
 	DWORD sessionCnt;
 	BYTE netMode; // << 나중에 화이트리스트 모드 등등 변경용
 
+
 	//readonly
 	SOCKET listenSock;
 	HANDLE hIOCP;
@@ -66,3 +68,4 @@ private:
 	bool isServerOn;
 };
 
+extern CMemoryPool g_LanServerPacketPool;

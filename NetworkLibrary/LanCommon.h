@@ -60,4 +60,3 @@ private:
 	int top = 0;
 };
 
-extern CMemoryPool g_LanPacketPool;
