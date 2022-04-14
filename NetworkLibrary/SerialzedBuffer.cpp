@@ -207,3 +207,13 @@ int CPacket::PutData(char* chpSrc, int iSrcSize)
     _rear += iSrcSize;
     return ret;
 }
+
+void CPacket::AddRef()
+{
+    InterlockedIncrement16(&refCnt);
+}
+
+void CPacket::SubRef()
+{
+    InterlockedDecrement16(&refCnt);
+}

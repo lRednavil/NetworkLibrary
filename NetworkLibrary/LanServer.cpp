@@ -4,19 +4,24 @@
 
 CMemoryPool g_LanServerPacketPool;
 
+#define ACCEPT_THREAD 1
+#define TIMER_THREAD 1
+
 bool CLanServer::Start(WCHAR* IP, DWORD port, DWORD createThreads, DWORD runningThreads, bool isNagle, DWORD maxConnect)
 {
     if (NetInit(IP, port, isNagle) == false) {
         return false;
     }
 
+    isServerOn = true;
+
     if (ThreadInit(createThreads, runningThreads) == false) {
+        isServerOn = false;
         return false;
     }
 
     sessionArr = new SESSION[maxConnect];
     InitializeSRWLock(&sessionMapLock);
-    isServerOn = true;
 
     return true;
 }
@@ -121,11 +126,11 @@ bool CLanServer::ThreadInit(const DWORD createThreads, const DWORD runningThread
     int cnt;
     
     //add 1 for accept thread
-    hThreads = new HANDLE[createThreads + 1];
+    hThreads = new HANDLE[createThreads + ACCEPT_THREAD];
 
     hThreads[0] = (HANDLE)_beginthreadex(NULL, 0, CLanServer::AcceptProc, this, NULL, NULL);
 
-    for (cnt = 1; cnt <= createThreads; cnt++) {
+    for (cnt = ACCEPT_THREAD; cnt < createThreads + ACCEPT_THREAD; cnt++) {
         hThreads[cnt] = (HANDLE)_beginthreadex(NULL, 0, CLanServer::WorkProc, this, NULL, NULL);
     }
 

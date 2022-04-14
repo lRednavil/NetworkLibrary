@@ -216,8 +216,11 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	int		PutData(char* chpSrc, int iSrcSize);
 
-
-
+	/// <summary>
+	/// refCnt용 함수들
+	/// </summary>
+	void	AddRef();
+	void	SubRef();
 
 protected:
 
@@ -227,6 +230,8 @@ protected:
 
 	int _head = 0;
 	int _rear = 0;
+
+	short refCnt = 0;
 };
 
 
