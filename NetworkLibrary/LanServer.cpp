@@ -181,6 +181,9 @@ bool CLanServer::MakeSession(DWORD64 sessionID, WCHAR* IP, SOCKET sock)
     session->isSending = false;
     session->ioCnt = 0;
 
+    wmemmove_s(session->IP, 16, IP, 16);
+    session->sessionID = sessionID;
+
     ZeroMemory(&session->recvOver, sizeof(session->recvOver));
     session->recvOver.type = 0;
     ZeroMemory(&session->sendOver, sizeof(session->sendOver));
