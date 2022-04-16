@@ -35,6 +35,7 @@ bool CLanServer::Start(WCHAR* IP, DWORD port, DWORD createThreads, DWORD running
 
 void CLanServer::Stop()
 {
+    isServerOn = false;
 }
 
 int CLanServer::GetSessionCount()
@@ -279,25 +280,29 @@ unsigned int __stdcall CLanServer::WorkProc(void* arg)
 
     CLanServer* server = (CLanServer*)arg;
 
-    for (;;) {
+    while(server->isServerOn) {
         ret = GetQueuedCompletionStatus(server->hIOCP, &bytes, (PULONG_PTR)&sessionID, (LPOVERLAPPED*)&overlap, INFINITE);
 
-        if (ret == false) {
-            server->lastError = WSAGetLastError();
-            server->OnError(server->lastError, L"GQCS return false");
-        }
-
-        if (overlap == NULL) {
-            continue;
-        }
+        //gqcs is false and overlap is NULL
+        //case totally failed
+		if (overlap == NULL) {
+			server->lastError = WSAGetLastError();
+			server->OnError(server->lastError, L"GQCS return false");
+		}
 
         session = server->AcquireSession(sessionID);
         
         if (session != NULL) {
+            if (ret == false) {
+                server->LoseSession(session);
+                continue;
+            }
             //recvd
             if (overlap->type == 0) {
-                session->recvQ.MoveRear(bytes);
-                server->RecvProc(session);
+                if(bytes != 0) {
+                    session->recvQ.MoveRear(bytes);
+                    server->RecvProc(session);
+                }
             }
             //sent
             if (overlap->type == 1) {
@@ -365,9 +370,8 @@ void CLanServer::RecvProc(SESSION* session)
         len = recvQ->GetUsedSize();
         //길이 판별
         if (sizeof(netHeader) > len) {
-            if (packet->SubRef() == 0) {
-                g_PacketPool.Free(packet);
-            }
+            packet->SubRef();
+			g_PacketPool.Free(packet);
             break;
         }
 
@@ -376,9 +380,8 @@ void CLanServer::RecvProc(SESSION* session)
 
         //길이 판별
         if (sizeof(netHeader) + netHeader.len > len) {
-            if (packet->SubRef() == 0) {
-                g_PacketPool.Free(packet);
-            }
+            packet->SubRef();
+			g_PacketPool.Free(packet);
             break;
         }
 
@@ -420,6 +423,7 @@ bool CLanServer::RecvPost(SESSION* session)
             //good
         }
         else {
+            OnError(lastError, L"SendPost Error");
             LoseSession(session);
             return false;
         }
@@ -477,6 +481,7 @@ bool CLanServer::SendPost(SESSION* session)
             //good
         }
         else {
+            OnError(err, L"SendPost Error");
             LoseSession(session);
             return false;
         }
