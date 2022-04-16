@@ -214,7 +214,10 @@ bool CLanServer::MakeSession(WCHAR* IP, SOCKET sock, DWORD64* ID)
     int sessionID_high;
     DWORD64 sessionID;
     SESSION* session;
-    //풀로 할당
+    //이전 세션 q찌꺼기 제거용
+    int leftQ;
+    CPacket* packet;
+
     //iocp var
     HANDLE h;
 
@@ -222,6 +225,7 @@ bool CLanServer::MakeSession(WCHAR* IP, SOCKET sock, DWORD64* ID)
         OnError(-1, L"All Session is in Use");
         return false;
     }
+
     sessionID = (totalAccept & SESSION_MASK);
     sessionID |= ((__int64)sessionID_high << MASK_SHIFT);
 
@@ -231,6 +235,13 @@ bool CLanServer::MakeSession(WCHAR* IP, SOCKET sock, DWORD64* ID)
     session->isSending = false;
     session->ioCnt &= ~RELEASE_FLAG;
     session->sendCnt = 0;
+    //남은 Q 찌꺼기 제거
+    for (leftQ = session->sendQ.GetSize(); leftQ > 0; --leftQ) {
+        session->sendQ.Dequeue(&packet);
+        if (packet->SubRef() == 0) {
+            g_PacketPool.Free(packet);
+        }
+    }
 
     wmemmove_s(session->IP, 16, IP, 16);
     session->sessionID = *ID = sessionID;
@@ -264,6 +275,7 @@ void CLanServer::ReleaseSession(SESSION* session)
 
     //delete에서 풀로 전환가자
     closesocket(sock);
+    //session->sessionID = 0;
 
     sessionStack.Push(session->sessionID >> MASK_SHIFT);
 }
@@ -294,26 +306,37 @@ unsigned int __stdcall CLanServer::WorkProc(void* arg)
         
         if (session != NULL) {
             if (ret == false) {
+                server->Disconnect(sessionID);
                 server->LoseSession(session);
-                continue;
             }
-            //recvd
-            if (overlap->type == 0) {
-                if(bytes != 0) {
-                    session->recvQ.MoveRear(bytes);
-                    server->RecvProc(session);
+            else {
+                //recvd
+                if (overlap->type == 0) {
+                    if (bytes == 0) {
+                        server->Disconnect(sessionID);
+                    }
+                    else
+                    {
+                        session->recvQ.MoveRear(bytes);
+                        server->RecvProc(session);
+                        //추가로 send에 맞춘 acquire
+                        server->AcquireSession(sessionID);
+                        server->SendPost(session);
+                    }
+
+                }
+                //sent
+                if (overlap->type == 1) {
+                    while (session->sendCnt) {
+                        --session->sendCnt;
+                        if (session->sendBuf[session->sendCnt]->SubRef() == 0)
+                            g_PacketPool.Free(session->sendBuf[session->sendCnt]);
+                    }
+                    InterlockedExchange8((char*)&session->isSending, 0);
+                    server->SendPost(session);
                 }
             }
-            //sent
-            if (overlap->type == 1) {
-                while (session->sendCnt) {
-                    --session->sendCnt;
-                    if (session->sendBuf[session->sendCnt]->SubRef() == 0)
-                        g_PacketPool.Free(session->sendBuf[session->sendCnt]);
-                }
-                InterlockedExchange8((char*)&session->isSending, 0);
-                server->SendPost(session);
-            }
+            //gqcs 후 session의 acquire에 대한 해제
             server->LoseSession(session);
         }
     }
@@ -360,7 +383,7 @@ void CLanServer::RecvProc(SESSION* session)
     NET_HEADER netHeader;
     DWORD len;
     CRingBuffer* recvQ = &session->recvQ;
-    CPacket* packet = NULL;
+    CPacket* packet;
 
     for (;;) {
         packet = g_PacketPool.Alloc();
@@ -439,6 +462,8 @@ bool CLanServer::SendPost(SESSION* session)
 {
     int ret;
     int err;
+    WORD cnt;
+    int sendCnt;
 
     bool isPending;
 
@@ -454,18 +479,18 @@ bool CLanServer::SendPost(SESSION* session)
     }
 
     sendQ = &session->sendQ;
+    sendCnt = sendQ->GetSize();
     //0byte send시 iocp에 결과만 Enqueue, 실제 0바이트 송신 X
-    // usedLen == 0 판별 중 Recv를 통한 SendPost에서 isPending Interlock 선 진입시 오류발생 이후에 send 요청 상실 >> 일부 패킷 소실의 버그
-    if (sendQ->GetSize() == 0) {
+    if (sendCnt == 0) {
         InterlockedExchange8((char*)&session->isSending, 0);
         LoseSession(session);
         return false;
     }
 
-    session->sendCnt = sendQ->GetSize();
+    session->sendCnt = sendCnt;
     ZeroMemory(pBuf, sizeof(WSABUF) * 100);
 
-    for (WORD cnt = 0; cnt < session->sendCnt; cnt++) {
+    for (cnt = 0; cnt < sendCnt; cnt++) {
         sendQ->Dequeue(&packet);
         session->sendBuf[cnt] = packet;
         pBuf[cnt].buf = packet->GetBufferPtr();
@@ -481,6 +506,11 @@ bool CLanServer::SendPost(SESSION* session)
             //good
         }
         else {
+            for (cnt = 0; cnt < sendCnt; cnt++) {
+                if (session->sendBuf[cnt]->SubRef() == 0) {
+                    g_PacketPool.Free(session->sendBuf[cnt]);
+                }
+            }
             OnError(err, L"SendPost Error");
             LoseSession(session);
             return false;

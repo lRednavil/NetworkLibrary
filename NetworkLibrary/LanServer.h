@@ -14,8 +14,8 @@ public:
 	bool SendPacket(DWORD64 sessionID, CPacket* packet);
 
 	CPacket* PacketAlloc();
-
-	virtual bool OnConnectionRequest(WCHAR* IP, DWORD Port) = 0; //< accept 직후
+	//accept 직후, IP filterinig 등의 목적
+	virtual bool OnConnectionRequest(WCHAR* IP, DWORD Port) = 0; 
 	//return false; 시 클라이언트 거부.
 	//return true; 시 접속 허용
 	virtual bool OnClientJoin(DWORD64 sessionID) = 0;
