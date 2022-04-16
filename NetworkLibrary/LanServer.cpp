@@ -275,7 +275,6 @@ void CLanServer::ReleaseSession(SESSION* session)
 
     //delete에서 풀로 전환가자
     closesocket(sock);
-    //session->sessionID = 0;
 
     sessionStack.Push(session->sessionID >> MASK_SHIFT);
 }
