@@ -13,11 +13,13 @@ public:
 	bool Disconnect(DWORD64 sessionID);
 	bool SendPacket(DWORD64 sessionID, CPacket* packet);
 
+	CPacket* PacketAlloc();
+
 	virtual bool OnConnectionRequest(WCHAR* IP, DWORD Port) = 0; //< accept 직후
 	//return false; 시 클라이언트 거부.
 	//return true; 시 접속 허용
-	virtual bool OnClientJoin() = 0;
-	virtual bool OnClientLeave() = 0;
+	virtual bool OnClientJoin(DWORD64 sessionID) = 0;
+	virtual bool OnClientLeave(DWORD64 sessionID) = 0;
 
 	//message 분석 역할
 	virtual void OnRecv(DWORD64 sessionID, CPacket* packet) = 0;
@@ -40,7 +42,7 @@ private:
 	void LoseSession(SESSION* session);
 
 	SESSION* FindSession(DWORD64 sessionID);
-	bool	MakeSession(WCHAR* IP, SOCKET sock);
+	bool	MakeSession(WCHAR* IP, SOCKET sock, DWORD64* ID);
 	void	ReleaseSession(SESSION* session);
 
 	static unsigned int __stdcall WorkProc(void* arg);
@@ -71,4 +73,3 @@ private:
 	bool isServerOn;
 };
 
-extern CMemoryPool g_LanServerPacketPool;

@@ -27,5 +27,8 @@
 #include "LockFreeMemoryPool.h"
 #include "LockFreeQueue.h"
 #include "LockFreeStack.h"
+#include "TLSMemoryPool.h"
+
+extern CTLSMemoryPool<CPacket> g_PacketPool;
 
 #endif //PCH_H

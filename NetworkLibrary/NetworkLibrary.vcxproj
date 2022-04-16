@@ -168,6 +168,7 @@
     <ClInclude Include="pch.h" />
     <ClInclude Include="RingBuffer.h" />
     <ClInclude Include="SerializedBuffer.h" />
+    <ClInclude Include="TLSMemoryPool.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="LanClient.cpp" />

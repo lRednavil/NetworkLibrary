@@ -2,8 +2,6 @@
 #include "LanServer.h"
 #include "LanCommon.h"
 
-CMemoryPool g_LanServerPacketPool;
-
 #define ACCEPT_THREAD 1
 #define TIMER_THREAD 1
 
@@ -69,6 +67,11 @@ bool CLanServer::SendPacket(DWORD64 sessionID, CPacket* packet)
     }
 
     return false;
+}
+
+CPacket* CLanServer::PacketAlloc()
+{
+    return g_PacketPool.Alloc();
 }
 
 bool CLanServer::NetInit(WCHAR* IP, DWORD port, bool isNagle)
@@ -205,7 +208,7 @@ SESSION* CLanServer::FindSession(DWORD64 sessionID)
     return &sessionArr[sessionID_high];
 }
 
-bool CLanServer::MakeSession(WCHAR* IP, SOCKET sock)
+bool CLanServer::MakeSession(WCHAR* IP, SOCKET sock, DWORD64* ID)
 {
     int sessionID_high;
     DWORD64 sessionID;
@@ -226,9 +229,10 @@ bool CLanServer::MakeSession(WCHAR* IP, SOCKET sock)
     session->sock = sock;
     session->isSending = false;
     session->ioCnt &= ~RELEASE_FLAG;
+    session->sendCnt = 0;
 
     wmemmove_s(session->IP, 16, IP, 16);
-    session->sessionID = sessionID;
+    session->sessionID = *ID = sessionID;
 
     ZeroMemory(&session->recvOver, sizeof(session->recvOver));
     session->recvOver.type = 0;
@@ -301,7 +305,7 @@ unsigned int __stdcall CLanServer::WorkProc(void* arg)
                 while (session->sendCnt) {
                     --session->sendCnt;
                     if (session->sendBuf[session->sendCnt]->SubRef() == 0)
-                        g_LanServerPacketPool.Free(session->sendBuf[session->sendCnt]);
+                        g_PacketPool.Free(session->sendBuf[session->sendCnt]);
                 }
                 InterlockedExchange8((char*)&session->isSending, 0);
                 server->SendPost(session);
@@ -320,6 +324,7 @@ unsigned int __stdcall CLanServer::AcceptProc(void* arg)
     WCHAR IP[16];
 
     CLanServer* server = (CLanServer*)arg;
+    DWORD64 sessionID;
 
     while(server->isServerOn) {
         sock = accept(server->listenSock, (sockaddr*)&addr, NULL);
@@ -334,11 +339,11 @@ unsigned int __stdcall CLanServer::AcceptProc(void* arg)
             continue;
         }
 
-        if (server->MakeSession(IP, sock) == false) {
+        if (server->MakeSession(IP, sock, &sessionID) == false) {
             continue;
         }
 
-        server->OnClientJoin();
+        server->OnClientJoin(sessionID);
     }
 
     return 0;
@@ -354,7 +359,7 @@ void CLanServer::RecvProc(SESSION* session)
     CPacket* packet = NULL;
 
     for (;;) {
-        packet = g_LanServerPacketPool.Alloc(packet);
+        packet = g_PacketPool.Alloc();
         packet->AddRef(1);
         packet->Clear();
 
@@ -362,7 +367,7 @@ void CLanServer::RecvProc(SESSION* session)
         //길이 판별
         if (sizeof(netHeader) > len) {
             if (packet->SubRef() == 0) {
-                g_LanServerPacketPool.Free(packet);
+                g_PacketPool.Free(packet);
             }
             break;
         }
@@ -373,7 +378,7 @@ void CLanServer::RecvProc(SESSION* session)
         //길이 판별
         if (sizeof(netHeader) + netHeader.len > len) {
             if (packet->SubRef() == 0) {
-                g_LanServerPacketPool.Free(packet);
+                g_PacketPool.Free(packet);
             }
             break;
         }
