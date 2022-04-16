@@ -46,27 +46,26 @@ int CLanServer::GetSessionCount()
 bool CLanServer::Disconnect(DWORD64 sessionID)
 {
     SESSION* session = AcquireSession(sessionID);
-    if (session != NULL) {
-        CancelIoEx((HANDLE)session->sock, NULL);
-        LoseSession(session);
-        return true;
+    if (session == NULL) {
+        return false;
     }
 
-    return false;
+    CancelIoEx((HANDLE)session->sock, NULL);
+    LoseSession(session);
+    return true;
 }
 
 bool CLanServer::SendPacket(DWORD64 sessionID, CPacket* packet)
 {
     SESSION* session = AcquireSession(sessionID);
 
-    if (session != NULL) {
-        session->sendQ.Enqueue(packet);
-        SendPost(session);
-        LoseSession(session);
-        return true;
+    if (session == NULL) {
+        return false;
     }
 
-    return false;
+    session->sendQ.Enqueue(packet);
+    SendPost(session);
+    return true;
 }
 
 CPacket* CLanServer::PacketAlloc()
@@ -145,6 +144,13 @@ bool CLanServer::ThreadInit(const DWORD createThreads, const DWORD runningThread
 {
     int cnt;
     
+    hIOCP = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, NULL, runningThreads);
+
+    if (hIOCP == NULL) {
+        return false;
+    }
+    _LOG(LOG_LEVEL_SYSTEM, L"LanServer IOCP Created");
+
     //add 1 for accept thread
     hThreads = new HANDLE[createThreads + ACCEPT_THREAD];
 
@@ -154,19 +160,13 @@ bool CLanServer::ThreadInit(const DWORD createThreads, const DWORD runningThread
         hThreads[cnt] = (HANDLE)_beginthreadex(NULL, 0, CLanServer::WorkProc, this, NULL, NULL);
     }
 
-    hIOCP = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, NULL, runningThreads);
-
-    if (hIOCP == NULL) {
-        return false;
-    }
-    _LOG(LOG_LEVEL_SYSTEM, L"LanServer IOCP Created");
-
     for (cnt = 0; cnt <= createThreads; cnt++) {
         if (hThreads[cnt] == INVALID_HANDLE_VALUE) {
             OnError(-1, L"Create Thread Failed");
             return false;
         }
     }
+    _LOG(LOG_LEVEL_SYSTEM, L"LanServer Thread Created");
 
     return true;
 }
@@ -258,7 +258,6 @@ void CLanServer::ReleaseSession(SESSION* session)
     if (InterlockedCompareExchange64((long long*)&session->ioCnt, RELEASE_FLAG, 0) != 0) {
         return;
     }
-
 
     SOCKET sock = session->sock;
 
@@ -446,6 +445,7 @@ bool CLanServer::SendPost(SESSION* session)
     
     isPending = InterlockedExchange8((char*)&session->isSending, 1);
     if (isPending == true) {
+        LoseSession(session);
         return false;
     }
 
@@ -454,6 +454,7 @@ bool CLanServer::SendPost(SESSION* session)
     // usedLen == 0 판별 중 Recv를 통한 SendPost에서 isPending Interlock 선 진입시 오류발생 이후에 send 요청 상실 >> 일부 패킷 소실의 버그
     if (sendQ->GetSize() == 0) {
         InterlockedExchange8((char*)&session->isSending, 0);
+        LoseSession(session);
         return false;
     }
 
@@ -481,7 +482,7 @@ bool CLanServer::SendPost(SESSION* session)
         }
     }
     else {
-        InterlockedExchange8((char*)&session->isSending, 0);
+        //sent in time
     }
 
     return true;

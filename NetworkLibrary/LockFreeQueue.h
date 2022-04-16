@@ -21,6 +21,7 @@ public:
 
 	int GetSize();
 
+
 private:
 	CLockFreeMemoryPool<QUEUE_NODE<DATA>> memPool;
 
@@ -129,5 +130,6 @@ inline int CLockFreeQueue<DATA>::GetSize()
 {
 	return size;
 }
+
 
 #undef NODEMASK
