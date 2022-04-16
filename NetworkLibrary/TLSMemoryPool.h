@@ -100,7 +100,7 @@ inline CHUNK<DATA>* CTLSMemoryPool<DATA>::ChunkAlloc()
 
 	chunk->freeCount = chunk->useCount = chunkSize;
 	if (chunk->arr == NULL) {
-		//chunks[InterlockedIncrement((long*)&capacity)] = chunk;
+		InterlockedIncrement((long*)&capacity);
 		chunk->arr = new CHUNKNODE<DATA>[chunkSize];
 
 		for (int arrCnt = 0; arrCnt < chunkSize; arrCnt++) {
@@ -119,11 +119,11 @@ inline bool CTLSMemoryPool<DATA>::Free(DATA* data)
 	if (newCall) {
 		data->~DATA();
 	}
-		
+
 	if (_InterlockedDecrement16(&(chunk->freeCount)) > 0) {
 		return true;
 	}
-	
+
 	_InterlockedDecrement((long*)&useCount);
 	return chunkPool.Free(chunk);
 }
