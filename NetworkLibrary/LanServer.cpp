@@ -74,7 +74,10 @@ bool CLanServer::SendPacket(DWORD64 sessionID, CPacket* packet)
 
 CPacket* CLanServer::PacketAlloc()
 {
-    return g_PacketPool.Alloc();
+    CPacket* packet = g_PacketPool.Alloc();
+    packet->AddRef(1);
+    packet->Clear();
+    return packet;
 }
 
 bool CLanServer::NetInit(WCHAR* IP, DWORD port, bool isNagle)
@@ -285,7 +288,10 @@ void CLanServer::ReleaseSession(SESSION* session)
 
     //sendBuffer에 남은 찌꺼기 제거
     for (leftCnt = 0; leftCnt < session->sendCnt; ++leftCnt) {
-        g_PacketPool.Free(session->sendBuf[leftCnt]);
+        packet = session->sendBuf[leftCnt];
+        if (packet->SubRef() == 0) {
+            g_PacketPool.Free(packet);
+        }
     }
     session->sendCnt = 0;
 
@@ -402,10 +408,8 @@ void CLanServer::RecvProc(SESSION* session)
     CPacket* packet;
 
     for (;;) {
-        packet = g_PacketPool.Alloc();
-        packet->AddRef(1);
-        packet->Clear();
-
+        packet = PacketAlloc();
+        
         len = recvQ->GetUsedSize();
         //길이 판별
         if (sizeof(netHeader) > len) {
