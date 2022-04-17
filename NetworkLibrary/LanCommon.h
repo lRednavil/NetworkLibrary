@@ -23,6 +23,7 @@ struct SESSION {
 	CPacket* sendBuf[100];
 	//monitor
 	DWORD sendCnt; // << 보낸 메세지수 확보
+	int debugMsg;
 
 	//readonly
 	SOCKET sock;

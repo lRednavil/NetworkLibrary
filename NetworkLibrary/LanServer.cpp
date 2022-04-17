@@ -61,6 +61,9 @@ bool CLanServer::SendPacket(DWORD64 sessionID, CPacket* packet)
     SESSION* session = AcquireSession(sessionID);
 
     if (session == NULL) {
+        if (packet->SubRef() == 0) {
+            g_PacketPool.Free(packet);
+        }
         return false;
     }
 
@@ -183,12 +186,14 @@ SESSION* CLanServer::AcquireSession(DWORD64 sessionID)
 
     if (session->ioCnt & RELEASE_FLAG) {
         LoseSession(session);
+        session->debugMsg = 1;
         return NULL;
     }
 
     //같은 세션인지 재확인
     if (session->sessionID != sessionID) {
         LoseSession(session);
+        session->debugMsg = 2;
         return NULL;
     }
 
@@ -232,8 +237,9 @@ bool CLanServer::MakeSession(WCHAR* IP, SOCKET sock, DWORD64* ID)
     session = &sessionArr[sessionID_high];
 
     session->sock = sock;
-    session->isSending = false;
+    //session->isSending = false; // << 얘가 범인이네
     session->ioCnt &= ~RELEASE_FLAG;
+    
 
     wmemmove_s(session->IP, 16, IP, 16);
     session->sessionID = *ID = sessionID;
@@ -279,9 +285,9 @@ void CLanServer::ReleaseSession(SESSION* session)
     }
 
     //sendBuffer에 남은 찌꺼기 제거
-    //for (leftCnt = 0; leftCnt < session->sendCnt; ++leftCnt) {
-    //    g_PacketPool.Free(session->sendBuf[leftCnt]);
-    //}
+    for (leftCnt = 0; leftCnt < session->sendCnt; ++leftCnt) {
+        g_PacketPool.Free(session->sendBuf[leftCnt]);
+    }
     session->sendCnt = 0;
 
     InterlockedDecrement(&sessionCnt);
@@ -306,49 +312,47 @@ unsigned int __stdcall CLanServer::WorkProc(void* arg)
 
         //gqcs is false and overlap is NULL
         //case totally failed
-		if (overlap == NULL) {
-			server->lastError = WSAGetLastError();
-			server->OnError(server->lastError, L"GQCS return false");
-		}
+        if (overlap == NULL) {
+            server->lastError = WSAGetLastError();
+            server->OnError(server->lastError, L"GQCS return NULL ovelap");
+            continue;
+        }
 
         session = server->AcquireSession(sessionID);
         
         if (session != NULL) {
-            if (ret == false) {
-                server->Disconnect(sessionID);
-                server->LoseSession(session);
-            }
-            else {
-                //recvd
-                if (overlap->type == 0) {
-                    if (bytes == 0) {
-                        server->Disconnect(sessionID);
-                        server->SendPost(session);
-                    }
-                    else
-                    {
-                        session->recvQ.MoveRear(bytes);
-                        server->RecvProc(session);
-                        //추가로 send에 맞춘 acquire
-                        server->AcquireSession(sessionID);
-                        server->SendPost(session);
-                    }
+			//recvd
+			if (overlap->type == 0) {
+				if (ret == false || bytes == 0) {
+					server->Disconnect(sessionID);
+				}
+				else
+				{
+					session->recvQ.MoveRear(bytes);
+					server->RecvProc(session);
+				}
 
-                }
-                //sent
-                if (overlap->type == 1) {
-                    while (session->sendCnt) {
-                        --session->sendCnt;
-                        if (session->sendBuf[session->sendCnt]->SubRef() == 0)
-                            g_PacketPool.Free(session->sendBuf[session->sendCnt]);
-                    }
-                    InterlockedExchange8((char*)&session->isSending, 0);
+			}
+			//sent
+			if (overlap->type == 1) {
+				while (session->sendCnt) {
+					--session->sendCnt;
+					if (session->sendBuf[session->sendCnt]->SubRef() == 0)
+						g_PacketPool.Free(session->sendBuf[session->sendCnt]);
+				}
+				InterlockedExchange8((char*)&session->isSending, 0);
+                if (ret != false) {
+                    //추가로 send에 맞춘 acquire
+                    server->AcquireSession(sessionID);
                     server->SendPost(session);
                 }
-            }
-            //gqcs 후 session의 acquire에 대한 해제
+			}
+            //작업 완료에 대한 lose
             server->LoseSession(session);
         }
+
+        //gqcs 후 session의 acquire에 대한 해제
+        server->LoseSession(session);
     }
 
     return 0;
@@ -394,6 +398,10 @@ void CLanServer::RecvProc(SESSION* session)
     DWORD len;
     CRingBuffer* recvQ = &session->recvQ;
     CPacket* packet;
+
+    if (AcquireSession(session->sessionID) == NULL) {
+        return;
+    }
 
     for (;;) {
         packet = g_PacketPool.Alloc();
@@ -515,12 +523,8 @@ bool CLanServer::SendPost(SESSION* session)
             //good
         }
         else {
-            for (cnt = 0; cnt < sendCnt; cnt++) {
-                if (session->sendBuf[cnt]->SubRef() == 0) {
-                    g_PacketPool.Free(session->sendBuf[cnt]);
-                }
-            }
             OnError(err, L"SendPost Error");
+            InterlockedExchange8((char*)&session->isSending, 0);
             LoseSession(session);
             return false;
         }
