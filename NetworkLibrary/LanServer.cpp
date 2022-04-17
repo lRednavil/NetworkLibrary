@@ -329,7 +329,9 @@ unsigned int __stdcall CLanServer::WorkProc(void* arg)
 				else
 				{
 					session->recvQ.MoveRear(bytes);
-					server->RecvProc(session);
+                    //Ãß°¡ recv¿¡ ¸ÂÃá acquire
+                    server->AcquireSession(sessionID);
+                    server->RecvProc(session);
 				}
 
 			}
@@ -399,10 +401,6 @@ void CLanServer::RecvProc(SESSION* session)
     CRingBuffer* recvQ = &session->recvQ;
     CPacket* packet;
 
-    if (AcquireSession(session->sessionID) == NULL) {
-        return;
-    }
-
     for (;;) {
         packet = g_PacketPool.Alloc();
         packet->AddRef(1);
@@ -464,7 +462,7 @@ bool CLanServer::RecvPost(SESSION* session)
             //good
         }
         else {
-            OnError(lastError, L"SendPost Error");
+            OnError(lastError, L"RecvPost Error");
             LoseSession(session);
             return false;
         }
