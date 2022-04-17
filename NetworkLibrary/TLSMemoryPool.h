@@ -37,8 +37,7 @@ private:
 private:
 	bool newCall;
 
-	CLockFreeMemoryPool<CHUNK<DATA>> chunkPool;
-	CHUNK<DATA>* chunks[100];
+	CLockFreeMemoryPool<CHUNK<DATA>>* chunkPool;
 
 	DWORD tlsID;
 	int chunkSize;
@@ -56,6 +55,8 @@ inline CTLSMemoryPool<DATA>::CTLSMemoryPool(int chunkSize, bool newCall) : chunk
 	capacity = 0;
 	useCount = 0;
 	allocTry = 0;
+
+	chunkPool = new CLockFreeMemoryPool<CHUNK<DATA>>;
 }
 
 template<class DATA>
@@ -78,6 +79,10 @@ inline DATA* CTLSMemoryPool<DATA>::Alloc()
 
 	--chunk->useCount;
 
+	if (chunk->useCount < 0) {
+		abort();
+	}
+
 	ret = &(chunk->arr[chunk->useCount].val);
 
 	if (newCall) {
@@ -96,7 +101,7 @@ inline DATA* CTLSMemoryPool<DATA>::Alloc()
 template<class DATA>
 inline CHUNK<DATA>* CTLSMemoryPool<DATA>::ChunkAlloc()
 {
-	CHUNK<DATA>* chunk = chunkPool.Alloc();
+	CHUNK<DATA>* chunk = chunkPool->Alloc();
 
 	chunk->freeCount = chunk->useCount = chunkSize;
 	if (chunk->arr == NULL) {
@@ -125,7 +130,8 @@ inline bool CTLSMemoryPool<DATA>::Free(DATA* data)
 	}
 
 	_InterlockedDecrement((long*)&useCount);
-	return chunkPool.Free(chunk);
+
+	return chunkPool->Free(chunk);
 }
 
 template<class DATA>

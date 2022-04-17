@@ -234,14 +234,6 @@ bool CLanServer::MakeSession(WCHAR* IP, SOCKET sock, DWORD64* ID)
     session->sock = sock;
     session->isSending = false;
     session->ioCnt &= ~RELEASE_FLAG;
-    session->sendCnt = 0;
-    //남은 Q 찌꺼기 제거
-    for (leftQ = session->sendQ.GetSize(); leftQ > 0; --leftQ) {
-        session->sendQ.Dequeue(&packet);
-        if (packet->SubRef() == 0) {
-            g_PacketPool.Free(packet);
-        }
-    }
 
     wmemmove_s(session->IP, 16, IP, 16);
     session->sessionID = *ID = sessionID;
@@ -272,9 +264,27 @@ void CLanServer::ReleaseSession(SESSION* session)
     }
 
     SOCKET sock = session->sock;
+    int leftCnt;
 
+    CPacket* packet;
     //delete에서 풀로 전환가자
     closesocket(sock);
+
+    //남은 Q 찌꺼기 제거
+    for (leftCnt = session->sendQ.GetSize(); leftCnt > 0; --leftCnt) {
+        session->sendQ.Dequeue(&packet);
+        if (packet->SubRef() == 0) {
+            g_PacketPool.Free(packet);
+        }
+    }
+
+    //sendBuffer에 남은 찌꺼기 제거
+    //for (leftCnt = 0; leftCnt < session->sendCnt; ++leftCnt) {
+    //    g_PacketPool.Free(session->sendBuf[leftCnt]);
+    //}
+    session->sendCnt = 0;
+
+    InterlockedDecrement(&sessionCnt);
 
     sessionStack.Push(session->sessionID >> MASK_SHIFT);
 }
@@ -313,6 +323,7 @@ unsigned int __stdcall CLanServer::WorkProc(void* arg)
                 if (overlap->type == 0) {
                     if (bytes == 0) {
                         server->Disconnect(sessionID);
+                        server->SendPost(session);
                     }
                     else
                     {
@@ -485,7 +496,6 @@ bool CLanServer::SendPost(SESSION* session)
         LoseSession(session);
         return false;
     }
-
     session->sendCnt = sendCnt;
     ZeroMemory(pBuf, sizeof(WSABUF) * 100);
 
