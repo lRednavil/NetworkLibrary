@@ -80,6 +80,7 @@ CPacket* CLanServer::PacketAlloc()
 bool CLanServer::NetInit(WCHAR* IP, DWORD port, bool isNagle)
 {
     int ret;
+    int err;
 
     WSADATA wsa;
     WSAStartup(MAKEWORD(2, 2), &wsa);
@@ -87,7 +88,7 @@ bool CLanServer::NetInit(WCHAR* IP, DWORD port, bool isNagle)
     //socket
     listenSock = socket(AF_INET, SOCK_STREAM, NULL);
     if (listenSock == INVALID_SOCKET) {
-        lastError = WSAGetLastError();
+        err = WSAGetLastError();
         return false;
     }
     _LOG(LOG_LEVEL_SYSTEM, L"Server Socket Made");
@@ -101,20 +102,20 @@ bool CLanServer::NetInit(WCHAR* IP, DWORD port, bool isNagle)
 
     ret = setsockopt(listenSock, SOL_SOCKET, SO_LINGER, (char*)&optval, sizeof(optval));
     if (ret == SOCKET_ERROR) {
-        lastError = WSAGetLastError();
+        err = WSAGetLastError();
         return false;
     }
 
     ret = setsockopt(listenSock, SOL_SOCKET, SO_SNDBUF, (char*)&sndSize, sizeof(sndSize));
     if (ret == SOCKET_ERROR) {
-        lastError = WSAGetLastError();
+        err = WSAGetLastError();
         return false;
     }
 
     if (isNagle == false) {
         ret = setsockopt(listenSock, IPPROTO_TCP, TCP_NODELAY, (char*)&isNagle, sizeof(isNagle));
         if (ret == SOCKET_ERROR) {
-            lastError = WSAGetLastError();
+            err = WSAGetLastError();
             return false;
         }
     }
@@ -128,7 +129,7 @@ bool CLanServer::NetInit(WCHAR* IP, DWORD port, bool isNagle)
 
     ret = bind(listenSock, (sockaddr*)&sockAddr, sizeof(sockAddr));
     if (ret == SOCKET_ERROR) {
-        lastError = WSAGetLastError();
+        err = WSAGetLastError();
         return false;
     }
     _LOG(LOG_LEVEL_SYSTEM, L"Server Binded");
@@ -136,7 +137,7 @@ bool CLanServer::NetInit(WCHAR* IP, DWORD port, bool isNagle)
     //listen
     ret = listen(listenSock, SOMAXCONN);
     if (ret == SOCKET_ERROR) {
-        lastError = WSAGetLastError();
+        err = WSAGetLastError();
         return false;
     }
     _LOG(LOG_LEVEL_SYSTEM, L"Server Start Listen");
@@ -186,14 +187,12 @@ SESSION* CLanServer::AcquireSession(DWORD64 sessionID)
 
     if (session->ioCnt & RELEASE_FLAG) {
         LoseSession(session);
-        session->debugMsg = 1;
         return NULL;
     }
 
     //같은 세션인지 재확인
     if (session->sessionID != sessionID) {
         LoseSession(session);
-        session->debugMsg = 2;
         return NULL;
     }
 
@@ -298,6 +297,7 @@ void CLanServer::ReleaseSession(SESSION* session)
 unsigned int __stdcall CLanServer::WorkProc(void* arg)
 {
     int ret;
+    int err;
     DWORD ioCnt;
 
     DWORD bytes;
@@ -313,8 +313,8 @@ unsigned int __stdcall CLanServer::WorkProc(void* arg)
         //gqcs is false and overlap is NULL
         //case totally failed
         if (overlap == NULL) {
-            server->lastError = WSAGetLastError();
-            server->OnError(server->lastError, L"GQCS return NULL ovelap");
+            err = WSAGetLastError();
+            server->OnError(err, L"GQCS return NULL ovelap");
             continue;
         }
 
@@ -440,6 +440,7 @@ void CLanServer::RecvProc(SESSION* session)
 bool CLanServer::RecvPost(SESSION* session)
 {
     int ret;
+    int err;
 
     CRingBuffer* recvQ = &session->recvQ;
 
@@ -456,13 +457,24 @@ bool CLanServer::RecvPost(SESSION* session)
     ret = WSARecv(session->sock, pBuf, 2, NULL, &flag, (LPWSAOVERLAPPED)&session->recvOver, NULL);
 
     if (ret == SOCKET_ERROR) {
-        lastError = WSAGetLastError();
+        err = WSAGetLastError();
 
-        if (lastError == WSA_IO_PENDING) {
+        if (err == WSA_IO_PENDING) {
             //good
         }
         else {
-            OnError(lastError, L"RecvPost Error");
+            switch (err) {
+            case 10053:
+            case 10054:
+            case 10057:
+            case 10058:
+            case 10060:
+            case 10061:
+            case 10064:
+                break;
+            default:
+                OnError(err, L"RecvPost Error");
+            }
             LoseSession(session);
             return false;
         }
@@ -521,7 +533,18 @@ bool CLanServer::SendPost(SESSION* session)
             //good
         }
         else {
-            OnError(err, L"SendPost Error");
+            switch (err) {
+            case 10053:
+            case 10054:
+            case 10057:
+            case 10058:
+            case 10060:
+            case 10061:
+            case 10064:
+                break;
+            default:
+                OnError(err, L"SendPost Error");
+            }
             InterlockedExchange8((char*)&session->isSending, 0);
             LoseSession(session);
             return false;

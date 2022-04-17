@@ -58,18 +58,16 @@ private:
 	CLockFreeStack<int> sessionStack;
 
 	DWORD64 totalAccept;
-	int lastError;
 
 	//monitor
 	DWORD sessionCnt;
 	BYTE netMode; // << 나중에 화이트리스트 모드 등등 변경용
-
+	bool isServerOn;
 
 	//readonly
 	SOCKET listenSock;
 	HANDLE hIOCP;
 
 	HANDLE* hThreads;
-	bool isServerOn;
 };
 
