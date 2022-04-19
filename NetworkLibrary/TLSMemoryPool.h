@@ -36,11 +36,12 @@ private:
 
 private:
 	bool newCall;
-
 	CLockFreeMemoryPool<CHUNK<DATA>>* chunkPool;
-
 	DWORD tlsID;
 	int chunkSize;
+	
+	//write field
+	alignas(64)
 	int capacity;
 	int useCount;
 

@@ -39,8 +39,6 @@ public:
 	int GetUseCount();
 
 private:
-	bool newCall;
-
 	POOLHEADER* topNode;
 
 	int capacity;
@@ -48,6 +46,9 @@ private:
 
 	long allocTry;
 
+	//read field
+	alignas(64)
+	bool newCall;
 };
 
 template<class DATA>

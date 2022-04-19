@@ -12,17 +12,6 @@ struct STACK_NODE {
 	STACK_NODE* next;
 	DATA val;
 };
-//
-//struct LOGDATA {
-//	void* thread = 0;
-//	short type = 0;
-//	void* val = 0;
-//	void* nxt = 0;
-//	int popTry;
-//};
-//
-//extern LOGDATA logArr[1000000];
-//extern DWORD logidx;
 
 template <class DATA>
 class CLockFreeStack
@@ -38,6 +27,8 @@ public:
 
 private:
 	CLockFreeMemoryPool<STACK_NODE<DATA>> memPool;
+	//memory pool°ú ºÐ¸®
+	alignas(64)
 	STACK_NODE<DATA>* volatile topNode;
 
 	unsigned int size;

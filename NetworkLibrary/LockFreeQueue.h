@@ -25,8 +25,10 @@ public:
 private:
 	CLockFreeMemoryPool<QUEUE_NODE<DATA>> memPool;
 
-	QUEUE_NODE<DATA>* headNode;
-	QUEUE_NODE<DATA>* tailNode;
+	//MemoryPool°ú CacheLine ºÐ¸®
+	alignas(64)
+	QUEUE_NODE<DATA>* volatile headNode;
+	QUEUE_NODE<DATA>* volatile tailNode;
 
 	int size;
 	unsigned int pushCnt;
