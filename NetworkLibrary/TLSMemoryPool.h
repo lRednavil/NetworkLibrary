@@ -40,6 +40,7 @@ private:
 	DWORD tlsID;
 	int chunkSize;
 	
+	
 	//write field
 	alignas(64)
 	int capacity;
