@@ -32,6 +32,6 @@ struct SESSION {
 	}
 };
 
-struct LAN_HEADER {
+struct NET_HEADER {
 	WORD len;
 };
