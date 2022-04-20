@@ -412,10 +412,7 @@ void CLanServer::RecvProc(SESSION* session)
         len = recvQ->GetUsedSize();
         //길이 판별
         if (sizeof(netHeader) > len) {
-            //packet->SubRef(); 
-            if (packet->SubRef() != 0) {
-                abort();
-            }
+            packet->SubRef(); 
 			g_PacketPool.Free(packet);
             break;
         }
@@ -425,10 +422,7 @@ void CLanServer::RecvProc(SESSION* session)
 
         //길이 판별
         if (sizeof(netHeader) + netHeader.len > len) {
-            //packet->SubRef(); 
-            if (packet->SubRef() != 0) {
-                abort();
-            }
+            packet->SubRef(); 
 			g_PacketPool.Free(packet);
             break;
         }
