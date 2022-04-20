@@ -35,6 +35,9 @@ private:
 	void NetClose();
 	void ThreadClose();
 
+	//packet에 header 할당
+	void	HeaderAlloc(CPacket* packet);
+
 	//return NULL for fail
 	//FindSession + Check Flag + Session 재확인
 	//반드시 LoseSession과 페어를 맞출 것

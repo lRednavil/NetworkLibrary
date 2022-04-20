@@ -65,6 +65,7 @@ bool CLanServer::SendPacket(DWORD64 sessionID, CPacket* packet)
         return false;
     }
 
+    HeaderAlloc(packet);
     session->sendQ.Enqueue(packet);
     SendPost(session);
     return true;
@@ -75,7 +76,14 @@ CPacket* CLanServer::PacketAlloc()
     CPacket* packet = g_PacketPool.Alloc();
     packet->AddRef(1);
     packet->Clear();
+    packet->MoveWritePos(sizeof(LAN_HEADER));
     return packet;
+}
+
+void CLanServer::HeaderAlloc(CPacket* packet)
+{
+    LAN_HEADER* header = (LAN_HEADER*)packet->GetBufferPtr();
+    header->len = packet->GetDataSize() - sizeof(LAN_HEADER);
 }
 
 void CLanServer::PacketFree(CPacket* packet)
@@ -399,9 +407,8 @@ unsigned int __stdcall CLanServer::AcceptProc(void* arg)
 
 void CLanServer::RecvProc(SESSION* session)
 {
-    //Packet 떼기 (netHeader 제거)
-    
-    LAN_HEADER netHeader;
+    //Packet 떼기 (lanHeader 제거)
+    LAN_HEADER lanHeader;
     DWORD len;
     CRingBuffer* recvQ = &session->recvQ;
     CPacket* packet;
@@ -411,28 +418,27 @@ void CLanServer::RecvProc(SESSION* session)
         
         len = recvQ->GetUsedSize();
         //길이 판별
-        if (sizeof(netHeader) > len) {
+        if (sizeof(lanHeader) > len) {
             packet->SubRef(); 
 			g_PacketPool.Free(packet);
             break;
         }
 
         //넷헤더 추출
-        recvQ->Peek((char*)&netHeader, sizeof(netHeader));
+        recvQ->Peek((char*)&lanHeader, sizeof(lanHeader));
 
         //길이 판별
-        if (sizeof(netHeader) + netHeader.len > len) {
+        if (sizeof(lanHeader) + lanHeader.len > len) {
             packet->SubRef(); 
 			g_PacketPool.Free(packet);
             break;
         }
 
         //넷헤더 영역 지나가기
-        recvQ->MoveFront(sizeof(netHeader));
+        recvQ->MoveFront(sizeof(lanHeader));
         //나중에 메세지 헤더 따라 처리 or MsgProc(session, packet)
-        packet->PutData((char*)&netHeader, sizeof(netHeader));
-        recvQ->Dequeue((char*)packet->GetWritePtr(), netHeader.len);
-        packet->MoveWritePos(netHeader.len);
+        recvQ->Dequeue((char*)packet->GetWritePtr(), lanHeader.len);
+        packet->MoveWritePos(lanHeader.len);
 
         OnRecv(session->sessionID, packet);
     }
