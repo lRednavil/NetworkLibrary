@@ -37,7 +37,10 @@ private:
 	void ThreadClose();
 
 	//packet에 header 할당
-	void	HeaderAlloc(CPacket* packet);
+	void HeaderAlloc(CPacket* packet);
+
+	void Encode(CPacket* packet);
+	void Decode(CPacket* packet);
 
 	//return NULL for fail
 	//FindSession + Check Flag + Session 재확인

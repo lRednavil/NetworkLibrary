@@ -32,6 +32,11 @@ struct SESSION {
 	}
 };
 
+#pragma pack(push, 1)
 struct NET_HEADER {
+	BYTE staticKey;
 	WORD len;
+	BYTE randomKey;
+	BYTE CHECKSUM;
 };
+#pragma pack(pop)

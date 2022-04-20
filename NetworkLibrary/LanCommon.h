@@ -32,6 +32,8 @@ struct SESSION {
 	}
 };
 
+#pragma pack(push, 1)
 struct LAN_HEADER {
 	WORD len;
 };
+#pragma pack(pop)
