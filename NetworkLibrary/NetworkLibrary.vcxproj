@@ -164,6 +164,7 @@
     <ClInclude Include="Logging.h" />
     <ClInclude Include="MemoryPool.h" />
     <ClInclude Include="NetClient.h" />
+    <ClInclude Include="NetCommon.h" />
     <ClInclude Include="NetServer.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="RingBuffer.h" />
@@ -180,6 +181,7 @@
     <ClCompile Include="Logging.cpp" />
     <ClCompile Include="MemoryPool.cpp" />
     <ClCompile Include="NetClient.cpp" />
+    <ClCompile Include="NetCommon.cpp" />
     <ClCompile Include="NetServer.cpp" />
     <ClCompile Include="NetworkLibrary.cpp" />
     <ClCompile Include="pch.cpp">

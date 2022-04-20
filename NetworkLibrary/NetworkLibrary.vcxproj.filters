@@ -63,6 +63,9 @@
     <ClInclude Include="TLSMemoryPool.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
+    <ClInclude Include="NetCommon.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="LanClient.cpp">
@@ -98,13 +101,16 @@
     <ClCompile Include="MemoryPool.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
-    <ClCompile Include="LanCommon.cpp">
-      <Filter>소스 파일</Filter>
-    </ClCompile>
     <ClCompile Include="LockFreeMemoryPool.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
+    <ClCompile Include="LanCommon.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
     <ClCompile Include="LockFreeStack.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="NetCommon.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
   </ItemGroup>
