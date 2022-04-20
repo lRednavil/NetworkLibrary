@@ -25,6 +25,7 @@ public:
 	virtual bool OnClientLeave(DWORD64 sessionID) = 0;
 
 	//message 분석 역할
+	//메세지 헤더는 알아서 검증할 것
 	virtual void OnRecv(DWORD64 sessionID, CPacket* packet) = 0;
 
 	virtual void OnError(int error, const WCHAR* msg) = 0;
@@ -39,6 +40,8 @@ private:
 	//packet에 header 할당
 	void HeaderAlloc(CPacket* packet);
 
+	//send시 체크섬 작성
+	//recv시 체크섬 검증
 	BYTE MakeCheckSum(CPacket* packet);
 	void Encode(CPacket* packet);
 	void Decode(CPacket* packet);

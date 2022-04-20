@@ -470,38 +470,48 @@ unsigned int __stdcall CNetServer::AcceptProc(void* arg)
 
 void CNetServer::RecvProc(SESSION* session)
 {
-    //Packet 떼기 (lanHeader 제거)
-    NET_HEADER lanHeader;
+    //Packet 떼기 (netHeader 제거)
+    NET_HEADER netHeader;
+    NET_HEADER* header;
     DWORD len;
     CRingBuffer* recvQ = &session->recvQ;
     CPacket* packet;
+
 
     for (;;) {
         packet = PacketAlloc();
 
         len = recvQ->GetUsedSize();
         //길이 판별
-        if (sizeof(lanHeader) > len) {
+        if (sizeof(netHeader) > len) {
             packet->SubRef();
             g_PacketPool.Free(packet);
             break;
         }
 
         //넷헤더 추출
-        recvQ->Peek((char*)&lanHeader, sizeof(lanHeader));
+        recvQ->Peek((char*)&netHeader, sizeof(netHeader));
 
         //길이 판별
-        if (sizeof(lanHeader) + lanHeader.len > len) {
+        if (sizeof(netHeader) + netHeader.len > len) {
             packet->SubRef();
             g_PacketPool.Free(packet);
             break;
         }
 
-        //넷헤더 영역 지나가기
-        recvQ->MoveFront(sizeof(lanHeader));
-        //나중에 메세지 헤더 따라 처리 or MsgProc(session, packet)
-        recvQ->Dequeue((char*)packet->GetWritePtr(), lanHeader.len);
-        packet->MoveWritePos(lanHeader.len);
+        //헤더영역 dequeue
+        recvQ->Dequeue((char*)packet->GetBufferPtr(), sizeof(netHeader) + netHeader.len);
+        packet->MoveWritePos(netHeader.len);
+
+        Decode(packet);
+        //checksum검증
+        header = (NET_HEADER*)packet->GetBufferPtr();
+        if (header->checkSum != MakeCheckSum(packet)) {
+            packet->SubRef();
+            g_PacketPool.Free(packet);
+            OnError(-1, L"Packet CheckSum Error");
+            break;
+        }
 
         OnRecv(session->sessionID, packet);
     }
