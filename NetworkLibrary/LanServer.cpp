@@ -91,9 +91,6 @@ void CLanServer::PacketFree(CPacket* packet)
     if (packet->SubRef() == 0) {
         g_PacketPool.Free(packet);
     }
-    else {
-        abort();
-    }
 }
 
 bool CLanServer::NetInit(WCHAR* IP, DWORD port, bool isNagle)

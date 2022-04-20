@@ -86,13 +86,19 @@ void CNetServer::HeaderAlloc(CPacket* packet)
     header->len = packet->GetDataSize() - sizeof(NET_HEADER);
 }
 
+void CNetServer::Encode(CPacket* packet)
+{
+
+}
+
+void CNetServer::Decode(CPacket* packet)
+{
+}
+
 void CNetServer::PacketFree(CPacket* packet)
 {
     if (packet->SubRef() == 0) {
         g_PacketPool.Free(packet);
-    }
-    else {
-        abort();
     }
 }
 
