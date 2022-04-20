@@ -9,6 +9,8 @@
 #define MASK_SHIFT 45
 #define RELEASE_FLAG 0x7000000000000000
 
+#define STATIC_KEY 0x32
+
 bool CNetServer::Start(WCHAR* IP, DWORD port, DWORD createThreads, DWORD runningThreads, bool isNagle, DWORD maxConnect)
 {
     if (NetInit(IP, port, isNagle) == false) {
@@ -77,22 +79,77 @@ CPacket* CNetServer::PacketAlloc()
     packet->AddRef(1);
     packet->Clear();
     packet->MoveWritePos(sizeof(NET_HEADER));
+    packet->isEncoded = false;
     return packet;
 }
 
 void CNetServer::HeaderAlloc(CPacket* packet)
 {
     NET_HEADER* header = (NET_HEADER*)packet->GetBufferPtr();
+    header->staticKey = STATIC_KEY;
     header->len = packet->GetDataSize() - sizeof(NET_HEADER);
+    header->randomKey = rand();
+    header->checkSum = MakeCheckSum(packet);
+}
+
+BYTE CNetServer::MakeCheckSum(CPacket* packet)
+{
+	BYTE ret;
+    char* ptr = packet->GetBufferPtr();
+    int len = packet->GetDataSize();
+    int cnt = sizeof(NET_HEADER);
+
+    for (cnt; cnt < len; ++cnt) {
+        ret += ptr[cnt];
+    }
+
+    return ret;
 }
 
 void CNetServer::Encode(CPacket* packet)
 {
+    if (packet->isEncoded) return;
+    
+    packet->isEncoded = true;
 
+    NET_HEADER* header = (NET_HEADER*)packet->GetBufferPtr();
+    char* ptr = (char*)&header->checkSum;
+    BYTE key = header->staticKey;
+    WORD len = header->len;
+    BYTE randKey = header->randomKey;
+    
+    WORD cnt;
+
+    ptr[0] ^= randKey + 1;
+    for (cnt = 1; cnt <= len; ++cnt) {
+        ptr[cnt] ^= ptr[cnt - 1] + randKey + cnt + 1;
+    }
+
+    ptr[0] ^= key + 1;
+    for (cnt = 1; cnt <= len; ++cnt) {
+        ptr[cnt] ^= ptr[cnt - 1] + key + cnt + 1;
+    }
 }
 
 void CNetServer::Decode(CPacket* packet)
 {
+    NET_HEADER* header = (NET_HEADER*)packet->GetBufferPtr();
+    char* ptr = (char*)&header->checkSum;
+    BYTE key = header->staticKey;
+    WORD len = header->len;
+    BYTE randKey = header->randomKey;
+
+    WORD cnt;
+
+    for (cnt = len; cnt > 0; --cnt) {
+        ptr[cnt] ^= ptr[cnt - 1] + key + cnt + 1;
+    }
+    ptr[0] ^= key + 1;
+
+    for (cnt = len; cnt > 0; --cnt) {
+        ptr[cnt] ^= ptr[cnt - 1] + randKey + cnt + 1;
+    }
+    ptr[0] ^= randKey + 1;
 }
 
 void CNetServer::PacketFree(CPacket* packet)

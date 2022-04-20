@@ -62,8 +62,6 @@ private:
 	//stack for session index
 	CLockFreeStack<int> sessionStack;
 
-	DWORD64 totalAccept;
-
 	//monitor
 	DWORD sessionCnt;
 	BYTE netMode; // << 나중에 화이트리스트 모드 등등 변경용

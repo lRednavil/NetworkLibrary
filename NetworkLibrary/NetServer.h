@@ -39,6 +39,7 @@ private:
 	//packet¿¡ header ÇÒ´ç
 	void HeaderAlloc(CPacket* packet);
 
+	BYTE MakeCheckSum(CPacket* packet);
 	void Encode(CPacket* packet);
 	void Decode(CPacket* packet);
 
@@ -65,8 +66,6 @@ private:
 	SESSION* sessionArr;
 	//stack for session index
 	CLockFreeStack<int> sessionStack;
-
-	DWORD64 totalAccept;
 
 	//monitor
 	DWORD sessionCnt;

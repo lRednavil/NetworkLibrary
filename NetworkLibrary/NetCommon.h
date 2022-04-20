@@ -37,6 +37,6 @@ struct NET_HEADER {
 	BYTE staticKey;
 	WORD len;
 	BYTE randomKey;
-	BYTE CHECKSUM;
+	BYTE checkSum;
 };
 #pragma pack(pop)
