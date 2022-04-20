@@ -13,8 +13,6 @@ struct SESSION {
 	//session refCnt의 역할
 	DWORD64 ioCnt;
 	bool isSending;
-	bool isDisconnect;
-
 	//네트워크 메세지용 버퍼들
 	CRingBuffer recvQ;
 	CLockFreeQueue<CPacket*> sendQ;
