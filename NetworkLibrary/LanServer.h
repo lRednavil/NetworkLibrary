@@ -42,6 +42,8 @@ private:
 	//ioCnt 차감 이후 Release 세션 진입
 	//반드시 AcquireSession 이나 ioCnt 증가 후에 사용
 	void LoseSession(SESSION* session);
+	//라이브러리 내부 disconnect 용도
+	void Disconnect(SESSION* session);
 
 	SESSION* FindSession(DWORD64 sessionID);
 	bool	MakeSession(WCHAR* IP, SOCKET sock, DWORD64* ID);

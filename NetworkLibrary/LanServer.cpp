@@ -52,6 +52,7 @@ bool CLanServer::Disconnect(DWORD64 sessionID)
     }
 
     CancelIoEx((HANDLE)session->sock, NULL);
+    session->isDisconnect = true;
     LoseSession(session);
     return true;
 }
@@ -217,6 +218,13 @@ void CLanServer::LoseSession(SESSION* session)
     }
 }
 
+void CLanServer::Disconnect(SESSION* session)
+{
+    CancelIoEx((HANDLE)session->sock, NULL);
+    session->isDisconnect = true;
+    LoseSession(session);
+}
+
 SESSION* CLanServer::FindSession(DWORD64 sessionID)
 {
     int sessionID_high = sessionID >> MASK_SHIFT;
@@ -245,7 +253,7 @@ bool CLanServer::MakeSession(WCHAR* IP, SOCKET sock, DWORD64* ID)
 
     session->sock = sock;
     session->ioCnt &= ~RELEASE_FLAG;
-    
+    session->isDisconnect = false;
 
     wmemmove_s(session->IP, 16, IP, 16);
     session->sessionID = *ID = sessionID;
@@ -330,7 +338,7 @@ unsigned int __stdcall CLanServer::WorkProc(void* arg)
 			//recvd
 			if (overlap->type == 0) {
 				if (ret == false || bytes == 0) {
-					server->Disconnect(sessionID);
+					server->Disconnect(session);
 				}
 				else
 				{
@@ -406,7 +414,7 @@ void CLanServer::RecvProc(SESSION* session)
     CRingBuffer* recvQ = &session->recvQ;
     CPacket* packet;
 
-    for (;;) {
+    while (session->isDisconnect == false) {
         packet = PacketAlloc();
         
         len = recvQ->GetUsedSize();
@@ -555,7 +563,7 @@ bool CLanServer::SendPost(SESSION* session)
             default:
                 OnError(err, L"SendPost Error");
             }
-            LoseSession(session);
+            Disconnect(session);
             return false;
         }
     }
