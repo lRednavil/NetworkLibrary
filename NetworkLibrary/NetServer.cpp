@@ -94,7 +94,7 @@ void CNetServer::HeaderAlloc(CPacket* packet)
 
 BYTE CNetServer::MakeCheckSum(CPacket* packet)
 {
-	BYTE ret;
+	BYTE ret = 0;
     char* ptr = packet->GetBufferPtr();
     int len = packet->GetDataSize();
     int cnt = sizeof(NET_HEADER);
@@ -236,7 +236,7 @@ bool CNetServer::ThreadInit(const DWORD createThreads, const DWORD runningThread
     if (hIOCP == NULL) {
         return false;
     }
-    _LOG(LOG_LEVEL_SYSTEM, L"LanServer IOCP Created");
+    _LOG(LOG_LEVEL_SYSTEM, L"NetServer IOCP Created");
 
     //add 1 for accept thread
     hThreads = new HANDLE[createThreads + ACCEPT_THREAD];
@@ -249,11 +249,11 @@ bool CNetServer::ThreadInit(const DWORD createThreads, const DWORD runningThread
 
     for (cnt = 0; cnt <= createThreads; cnt++) {
         if (hThreads[cnt] == INVALID_HANDLE_VALUE) {
-            OnError(-1, L"Create Thread Failed");
+            OnError(-100, L"Create Thread Failed");
             return false;
         }
     }
-    _LOG(LOG_LEVEL_SYSTEM, L"LanServer Thread Created");
+    _LOG(LOG_LEVEL_SYSTEM, L"NetServer Thread Created");
 
     return true;
 }
@@ -351,6 +351,8 @@ void CNetServer::ReleaseSession(SESSION* session)
     CPacket* packet;
 
     closesocket(sock);
+
+    OnClientLeave(session->sessionID);
 
     //남은 Q 찌꺼기 제거
     while (session->sendQ.Dequeue(&packet))
@@ -510,7 +512,9 @@ void CNetServer::RecvProc(SESSION* session)
             packet->SubRef();
             g_PacketPool.Free(packet);
             OnError(-1, L"Packet CheckSum Error");
-            break;
+            //체크섬 변조시 접속 제거
+            Disconnect(session->sessionID);
+            return;
         }
 
         OnRecv(session->sessionID, packet);

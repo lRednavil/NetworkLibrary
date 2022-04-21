@@ -286,6 +286,8 @@ void CLanServer::ReleaseSession(SESSION* session)
     
     closesocket(sock);
 
+    OnClientLeave(session->sessionID);
+
     //³²Àº Q Âî²¨±â Á¦°Å
     while(session->sendQ.Dequeue(&packet))
     {
