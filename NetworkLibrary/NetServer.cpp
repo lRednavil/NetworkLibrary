@@ -9,7 +9,8 @@
 #define MASK_SHIFT 45
 #define RELEASE_FLAG 0x7000000000000000
 
-#define STATIC_KEY 0x77
+#define STATIC_CODE 0x77
+#define STATIC_KEY 0x32
 
 bool CNetServer::Start(WCHAR* IP, DWORD port, DWORD createThreads, DWORD runningThreads, bool isNagle, DWORD maxConnect)
 {
@@ -68,6 +69,7 @@ bool CNetServer::SendPacket(DWORD64 sessionID, CPacket* packet)
     }
 
     HeaderAlloc(packet);
+    Encode(packet);
     session->sendQ.Enqueue(packet);
     SendPost(session);
     return true;
@@ -86,7 +88,7 @@ CPacket* CNetServer::PacketAlloc()
 void CNetServer::HeaderAlloc(CPacket* packet)
 {
     NET_HEADER* header = (NET_HEADER*)packet->GetBufferPtr();
-    header->staticKey = STATIC_KEY;
+    header->staticCode = STATIC_CODE;
     header->len = packet->GetDataSize() - sizeof(NET_HEADER);
     header->randomKey = rand();
     header->checkSum = MakeCheckSum(packet);
@@ -113,8 +115,8 @@ void CNetServer::Encode(CPacket* packet)
     packet->isEncoded = true;
 
     NET_HEADER* header = (NET_HEADER*)packet->GetBufferPtr();
-    char* ptr = (char*)&header->checkSum;
-    BYTE key = header->staticKey;
+    BYTE* ptr = (BYTE*)&header->checkSum;
+    BYTE key = STATIC_KEY;
     WORD len = header->len;
     BYTE randKey = header->randomKey;
     
@@ -134,8 +136,8 @@ void CNetServer::Encode(CPacket* packet)
 void CNetServer::Decode(CPacket* packet)
 {
     NET_HEADER* header = (NET_HEADER*)packet->GetBufferPtr();
-    char* ptr = (char*)&header->checkSum;
-    BYTE key = header->staticKey;
+    BYTE* ptr = (BYTE*)&header->checkSum;
+    BYTE key = STATIC_KEY;
     WORD len = header->len;
     BYTE randKey = header->randomKey;
 
@@ -505,6 +507,15 @@ void CNetServer::RecvProc(SESSION* session)
         recvQ->Dequeue((char*)packet->GetBufferPtr(), sizeof(netHeader) + netHeader.len);
         packet->MoveWritePos(netHeader.len);
 
+        if (netHeader.staticCode != STATIC_CODE) {
+            packet->SubRef();
+            g_PacketPool.Free(packet);
+            OnError(-1, L"Packet CheckSum Error");
+            //헤드코드 변조시 접속 제거
+            Disconnect(session->sessionID);
+            return;
+        }
+
         Decode(packet);
         //checksum검증
         header = (NET_HEADER*)packet->GetBufferPtr();
@@ -516,7 +527,8 @@ void CNetServer::RecvProc(SESSION* session)
             Disconnect(session->sessionID);
             return;
         }
-
+        //사용전 net헤더 스킵
+        packet->MoveReadPos(sizeof(netHeader));
         OnRecv(session->sessionID, packet);
     }
 

@@ -34,7 +34,7 @@ struct SESSION {
 
 #pragma pack(push, 1)
 struct NET_HEADER {
-	BYTE staticKey;
+	BYTE staticCode;
 	WORD len;
 	BYTE randomKey;
 	BYTE checkSum;
