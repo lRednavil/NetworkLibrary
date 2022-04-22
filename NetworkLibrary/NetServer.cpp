@@ -9,7 +9,7 @@
 #define MASK_SHIFT 45
 #define RELEASE_FLAG 0x7000000000000000
 
-#define STATIC_KEY 0x32
+#define STATIC_KEY 0x77
 
 bool CNetServer::Start(WCHAR* IP, DWORD port, DWORD createThreads, DWORD runningThreads, bool isNagle, DWORD maxConnect)
 {
