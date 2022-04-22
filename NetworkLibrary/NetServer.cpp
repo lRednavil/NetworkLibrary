@@ -87,6 +87,8 @@ CPacket* CNetServer::PacketAlloc()
 
 void CNetServer::HeaderAlloc(CPacket* packet)
 {
+    if (packet->isEncoded) return;
+
     NET_HEADER* header = (NET_HEADER*)packet->GetBufferPtr();
     header->staticCode = STATIC_CODE;
     header->len = packet->GetDataSize() - sizeof(NET_HEADER);
