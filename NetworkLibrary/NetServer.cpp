@@ -1,16 +1,9 @@
 #include "pch.h"
 #include "NetServer.h"
 #include "NetCommon.h"
+#include <timeapi.h>
 
-#define ACCEPT_THREAD 1
-#define TIMER_THREAD 1
-
-#define SESSION_MASK 0x00000fffffffffff
-#define MASK_SHIFT 45
-#define RELEASE_FLAG 0x7000000000000000
-
-#define STATIC_CODE 0x77
-#define STATIC_KEY 0x32
+#pragma comment(lib, "Winmm")
 
 bool CNetServer::Start(WCHAR* IP, DWORD port, DWORD createThreads, DWORD runningThreads, bool isNagle, DWORD maxConnect)
 {
@@ -23,6 +16,7 @@ bool CNetServer::Start(WCHAR* IP, DWORD port, DWORD createThreads, DWORD running
 
     totalAccept = 0;
     sessionCnt = 0;
+    maxConnection = maxConnect;
 
     for (int cnt = 0; cnt < maxConnect; cnt++) {
         sessionStack.Push(cnt);
@@ -45,6 +39,22 @@ void CNetServer::Stop()
 int CNetServer::GetSessionCount()
 {
     return sessionCnt;
+}
+
+void CNetServer::Monitor()
+{
+    system("cls");
+    wprintf_s(L"Total Accept : %llu \n", totalAccept);
+    wprintf_s(L"Total Send : %llu \n", totalSend);
+    wprintf_s(L"Total Recv : %llu \n", totalRecv);
+    wprintf_s(L"=============================\n");
+    wprintf_s(L"Accept TPS : %llu \n", totalAccept - lastAccept);
+    wprintf_s(L"Send TPS : %llu \n", totalSend - lastSend);
+    wprintf_s(L"Recv TPS : %llu \n", totalRecv - lastRecv);
+
+    lastAccept = totalAccept;
+    lastSend = totalSend;
+    lastRecv = totalRecv;
 }
 
 bool CNetServer::Disconnect(DWORD64 sessionID)
@@ -163,6 +173,17 @@ void CNetServer::PacketFree(CPacket* packet)
     }
 }
 
+void CNetServer::SetTimeOut(DWORD64 sessionID, DWORD timeVal)
+{
+    SESSION* session = AcquireSession(sessionID);
+
+    if (session == NULL) {
+        return;
+    }
+
+    session->timeOutVal = timeVal;
+}
+
 bool CNetServer::NetInit(WCHAR* IP, DWORD port, bool isNagle)
 {
     int ret;
@@ -243,17 +264,18 @@ bool CNetServer::ThreadInit(const DWORD createThreads, const DWORD runningThread
     _LOG(LOG_LEVEL_SYSTEM, L"NetServer IOCP Created");
 
     //add 1 for accept thread
-    hThreads = new HANDLE[createThreads + ACCEPT_THREAD];
+    hThreads = new HANDLE[createThreads + ACCEPT_THREAD + TIMER_THREAD];
 
     hThreads[0] = (HANDLE)_beginthreadex(NULL, 0, CNetServer::AcceptProc, this, NULL, NULL);
+    hThreads[1] = (HANDLE)_beginthreadex(NULL, 0, CNetServer::TimerProc, this, NULL, NULL);
 
-    for (cnt = ACCEPT_THREAD; cnt < createThreads + ACCEPT_THREAD; cnt++) {
+    for (cnt = ACCEPT_THREAD + TIMER_THREAD; cnt < createThreads + ACCEPT_THREAD + TIMER_THREAD; cnt++) {
         hThreads[cnt] = (HANDLE)_beginthreadex(NULL, 0, CNetServer::WorkProc, this, NULL, NULL);
     }
 
-    for (cnt = 0; cnt <= createThreads; cnt++) {
+    for (cnt = 0; cnt < createThreads + ACCEPT_THREAD + TIMER_THREAD; cnt++) {
         if (hThreads[cnt] == INVALID_HANDLE_VALUE) {
-            OnError(-100, L"Create Thread Failed");
+            OnError(-1, L"Create Thread Failed");
             return false;
         }
     }
@@ -476,6 +498,31 @@ unsigned int __stdcall CNetServer::AcceptProc(void* arg)
     return 0;
 }
 
+unsigned int __stdcall CNetServer::TimerProc(void* arg)
+{
+    CNetServer* server = (CNetServer*)arg;
+    SESSION* session;
+    int cnt;
+    while (server->isServerOn) {
+        server->currentTime = timeGetTime();
+        
+        for (cnt = 0; cnt < server->maxConnection; ++cnt) {
+            session = &server->sessionArr[cnt];
+
+            if (session->ioCnt == RELEASE_FLAG) continue;
+
+            if (server->currentTime - session->lastTime >= session->timeOutVal) {
+                server->Disconnect(session->sessionID);
+                server->OnTimeOut(session->sessionID);
+            }
+        }
+
+        Sleep(1000);
+    }
+
+    return 0;
+}
+
 void CNetServer::RecvProc(SESSION* session)
 {
     //Packet 떼기 (netHeader 제거)
@@ -485,6 +532,7 @@ void CNetServer::RecvProc(SESSION* session)
     CRingBuffer* recvQ = &session->recvQ;
     CPacket* packet;
 
+    session->lastTime = currentTime;
 
     for (;;) {
         packet = PacketAlloc();
@@ -506,6 +554,8 @@ void CNetServer::RecvProc(SESSION* session)
             g_PacketPool.Free(packet);
             break;
         }
+
+        InterlockedIncrement(&totalRecv);
 
         //헤더영역 dequeue
         recvQ->Dequeue((char*)packet->GetBufferPtr(), sizeof(netHeader) + netHeader.len);
@@ -618,6 +668,8 @@ bool CNetServer::SendPost(SESSION* session)
 
     session->sendCnt = min(200, sendCnt);
     ZeroMemory(pBuf, sizeof(WSABUF) * 200);
+
+    InterlockedAdd64((__int64*)&totalSend, session->sendCnt);
 
     for (cnt = 0; cnt < sendCnt; cnt++) {
         sendQ->Dequeue(&packet);

@@ -10,6 +10,8 @@ public:
 	bool Start(WCHAR* IP, DWORD port, DWORD createThreads, DWORD runningThreads, bool isNagle, DWORD maxConnect);
 	void Stop();
 	int GetSessionCount();
+	//모니터링용 함수
+	void Monitor();
 
 	bool Disconnect(DWORD64 sessionID);
 	bool SendPacket(DWORD64 sessionID, CPacket* packet);
@@ -17,6 +19,9 @@ public:
 	//기본 참조카운트 1부여 및 초기화 실행
 	CPacket* PacketAlloc();
 	void	PacketFree(CPacket* packet);
+
+	void SetTimeOut(DWORD64 sessionID, DWORD timeVal);
+
 	//accept 직후, IP filterinig 등의 목적
 	virtual bool OnConnectionRequest(WCHAR* IP, DWORD Port) = 0;
 	//return false; 시 클라이언트 거부.
@@ -27,6 +32,8 @@ public:
 	//message 분석 역할
 	//메세지 헤더는 알아서 검증할 것
 	virtual void OnRecv(DWORD64 sessionID, CPacket* packet) = 0;
+
+	virtual void OnTimeOut(DWORD64 sessionID) = 0;
 
 	virtual void OnError(int error, const WCHAR* msg) = 0;
 
@@ -60,9 +67,26 @@ private:
 
 	static unsigned int __stdcall WorkProc(void* arg);
 	static unsigned int __stdcall AcceptProc(void* arg);
+	static unsigned int __stdcall TimerProc(void* arg);
 	void RecvProc(SESSION* session);
 	bool RecvPost(SESSION* session);
 	bool SendPost(SESSION* session);
+	
+protected:
+	//sessionID 겸용
+	DWORD64 totalAccept = 0;
+	DWORD64 totalSend = 0;
+	DWORD64 totalRecv = 0;
+	//tps측정용 기억
+	DWORD64 lastAccept = 0;
+	DWORD64 lastSend = 0;
+	DWORD64 lastRecv = 0;
+	
+	DWORD64 recvBytes = 0;
+	DWORD64 sendBytes = 0;
+	
+	//시간 기억
+	DWORD currentTime;
 
 private:
 	//array for session
@@ -70,11 +94,9 @@ private:
 	//stack for session index
 	CLockFreeStack<int> sessionStack;
 
-	//sessionID로 사용
-	DWORD64 totalAccept;
-
 	//monitor
 	DWORD sessionCnt;
+	DWORD maxConnection;
 	BYTE netMode; // << 나중에 화이트리스트 모드 등등 변경용
 	bool isServerOn;
 
