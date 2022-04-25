@@ -673,7 +673,7 @@ bool CNetServer::SendPost(SESSION* session)
 
     InterlockedAdd64((__int64*)&totalSend, session->sendCnt);
 
-    for (cnt = 0; cnt < sendCnt; cnt++) {
+    for (cnt = 0; cnt < session->sendCnt; cnt++) {
         sendQ->Dequeue(&packet);
         session->sendBuf[cnt] = packet;
         pBuf[cnt].buf = packet->GetBufferPtr();
