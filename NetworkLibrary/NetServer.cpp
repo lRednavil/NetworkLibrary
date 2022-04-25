@@ -182,6 +182,7 @@ void CNetServer::SetTimeOut(DWORD64 sessionID, DWORD timeVal)
     }
 
     session->timeOutVal = timeVal;
+    LoseSession(session);
 }
 
 bool CNetServer::NetInit(WCHAR* IP, DWORD port, bool isNagle)
@@ -342,7 +343,7 @@ bool CNetServer::MakeSession(WCHAR* IP, SOCKET sock, DWORD64* ID)
 
     session->sock = sock;
     session->ioCnt &= ~RELEASE_FLAG;
-
+    session->lastTime = currentTime;
 
     wmemmove_s(session->IP, 16, IP, 16);
     session->sessionID = *ID = sessionID;
