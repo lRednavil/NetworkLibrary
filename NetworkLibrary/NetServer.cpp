@@ -342,13 +342,14 @@ bool CNetServer::MakeSession(WCHAR* IP, SOCKET sock, DWORD64* ID)
     session = &sessionArr[sessionID_high];
 
     session->sock = sock;
+
+    wmemmove_s(session->IP, 16, IP, 16);
+    session->sessionID = *ID = sessionID;
+
     //recv¿ë ioCountÁõ°¡
     InterlockedIncrement(&session->ioCnt);
     session->ioCnt &= ~RELEASE_FLAG;
     session->lastTime = currentTime;
-
-    wmemmove_s(session->IP, 16, IP, 16);
-    session->sessionID = *ID = sessionID;
 
     ZeroMemory(&session->recvOver, sizeof(session->recvOver));
     session->recvOver.type = 0;
