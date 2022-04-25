@@ -342,6 +342,8 @@ bool CNetServer::MakeSession(WCHAR* IP, SOCKET sock, DWORD64* ID)
     session = &sessionArr[sessionID_high];
 
     session->sock = sock;
+    //recv¿ë ioCountÁõ°¡
+    InterlockedIncrement(&session->ioCnt);
     session->ioCnt &= ~RELEASE_FLAG;
     session->lastTime = currentTime;
 
@@ -362,7 +364,6 @@ bool CNetServer::MakeSession(WCHAR* IP, SOCKET sock, DWORD64* ID)
 
     InterlockedIncrement(&sessionCnt);
     //recv start
-    InterlockedIncrement(&session->ioCnt);
     return RecvPost(session);
 }
 
