@@ -51,6 +51,8 @@ void CNetServer::Monitor()
     wprintf_s(L"Accept TPS : %llu \n", totalAccept - lastAccept);
     wprintf_s(L"Send TPS : %llu \n", totalSend - lastSend);
     wprintf_s(L"Recv TPS : %llu \n", totalRecv - lastRecv);
+    wprintf_s(L"=============================\n");
+    wprintf_s(L"Current Sessions : %lu \n", sessionCnt);
 
     lastAccept = totalAccept;
     lastSend = totalSend;
@@ -332,7 +334,6 @@ bool CNetServer::MakeSession(WCHAR* IP, SOCKET sock, DWORD64* ID)
     HANDLE h;
 
     if (sessionStack.Pop(&sessionID_high) == false) {
-        OnError(-1, L"All Session is in Use");
         return false;
     }
 
@@ -355,13 +356,15 @@ bool CNetServer::MakeSession(WCHAR* IP, SOCKET sock, DWORD64* ID)
     h = CreateIoCompletionPort((HANDLE)session->sock, hIOCP, (ULONG_PTR)sessionID, 0);
     if (h != hIOCP) {
         _LOG(LOG_LEVEL_SYSTEM, L"IOCP to SOCKET Failed");
+        OnError(-1, L"IOCP to SOCKET Failed");
         return false;
     }
+
+    session->lastTime = currentTime;
 
     //recv¿ë ioCountÁõ°¡
     InterlockedIncrement(&session->ioCnt);
     session->ioCnt &= ~RELEASE_FLAG;
-    session->lastTime = currentTime;
 
     InterlockedIncrement(&sessionCnt);
     //recv start
@@ -514,7 +517,7 @@ unsigned int __stdcall CNetServer::TimerProc(void* arg)
         for (cnt = 0; cnt < server->maxConnection; ++cnt) {
             session = &server->sessionArr[cnt];
 
-            if (session->ioCnt == RELEASE_FLAG) continue;
+            if (session->ioCnt & RELEASE_FLAG) continue;
 
             if (server->currentTime - session->lastTime >= session->timeOutVal) {
                 server->Disconnect(session->sessionID);

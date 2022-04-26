@@ -10,7 +10,7 @@
 #define STATIC_CODE 0x77
 #define STATIC_KEY 0x32
 
-#define SEND_PACKET_MAX 500
+#define SEND_PACKET_MAX 200
 
 class CMemoryPool;
 
