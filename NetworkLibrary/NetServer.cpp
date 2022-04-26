@@ -654,7 +654,7 @@ bool CNetServer::SendPost(SESSION* session)
     CLockFreeQueue<CPacket*>* sendQ;
     CPacket* packet;
 
-    WSABUF pBuf[200];
+    WSABUF pBuf[SEND_PACKET_MAX];
 
     //다른 SendPost진행중인지 확인용
     if (InterlockedExchange8((char*)&session->isSending, 1) == true) {
@@ -671,8 +671,8 @@ bool CNetServer::SendPost(SESSION* session)
         return false;
     }
 
-    session->sendCnt = min(200, sendCnt);
-    ZeroMemory(pBuf, sizeof(WSABUF) * 200);
+    session->sendCnt = min(SEND_PACKET_MAX, sendCnt);
+    ZeroMemory(pBuf, sizeof(WSABUF) * SEND_PACKET_MAX);
 
     InterlockedAdd64((__int64*)&totalSend, session->sendCnt);
 
@@ -683,7 +683,7 @@ bool CNetServer::SendPost(SESSION* session)
         pBuf[cnt].len = packet->GetDataSize();
     }
 
-    ret = WSASend(session->sock, pBuf, 200, NULL, 0, (LPWSAOVERLAPPED)&session->sendOver, NULL);
+    ret = WSASend(session->sock, pBuf, session->sendCnt, NULL, 0, (LPWSAOVERLAPPED)&session->sendOver, NULL);
 
     if (ret == SOCKET_ERROR) {
         err = WSAGetLastError();

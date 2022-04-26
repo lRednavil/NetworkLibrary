@@ -10,6 +10,8 @@
 #define STATIC_CODE 0x77
 #define STATIC_KEY 0x32
 
+#define SEND_PACKET_MAX 500
+
 class CMemoryPool;
 
 struct OVERLAPPEDEX {
@@ -33,7 +35,7 @@ struct SESSION {
 	DWORD timeOutVal;
 
 	//send 후 해제용
-	CPacket* sendBuf[200];
+	CPacket* sendBuf[SEND_PACKET_MAX];
 	//monitor
 	DWORD sendCnt; // << 보낸 메세지수 확보
 
