@@ -488,6 +488,7 @@ unsigned int __stdcall CNetServer::AcceptProc(void* arg)
         InetNtop(AF_INET, &addr.sin_addr, IP, 16);
 
         if (server->OnConnectionRequest(IP, ntohs(addr.sin_port)) == false) {
+            closesocket(sock);
             continue;
         }
 
