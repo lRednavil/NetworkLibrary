@@ -346,11 +346,6 @@ bool CNetServer::MakeSession(WCHAR* IP, SOCKET sock, DWORD64* ID)
     wmemmove_s(session->IP, 16, IP, 16);
     session->sessionID = *ID = sessionID;
 
-    //recv용 ioCount증가
-    InterlockedIncrement(&session->ioCnt);
-    session->ioCnt &= ~RELEASE_FLAG;
-    session->lastTime = currentTime;
-
     ZeroMemory(&session->recvOver, sizeof(session->recvOver));
     session->recvOver.type = 0;
     ZeroMemory(&session->sendOver, sizeof(session->sendOver));
@@ -362,6 +357,11 @@ bool CNetServer::MakeSession(WCHAR* IP, SOCKET sock, DWORD64* ID)
         _LOG(LOG_LEVEL_SYSTEM, L"IOCP to SOCKET Failed");
         return false;
     }
+
+    //recv용 ioCount증가
+    InterlockedIncrement(&session->ioCnt);
+    session->ioCnt &= ~RELEASE_FLAG;
+    session->lastTime = currentTime;
 
     InterlockedIncrement(&sessionCnt);
     //recv start
@@ -492,6 +492,7 @@ unsigned int __stdcall CNetServer::AcceptProc(void* arg)
         }
 
         if (server->MakeSession(IP, sock, &sessionID) == false) {
+            closesocket(sock);
             continue;
         }
 
