@@ -334,6 +334,7 @@ bool CNetServer::MakeSession(WCHAR* IP, SOCKET sock, DWORD64* ID)
     HANDLE h;
 
     if (sessionStack.Pop(&sessionID_high) == false) {
+        OnError(-1, L"All Session is in Use");
         return false;
     }
 
