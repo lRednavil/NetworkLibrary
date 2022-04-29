@@ -66,6 +66,12 @@
     <ClInclude Include="NetCommon.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
+    <ClInclude Include="ProcessMonitor.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="ProcessorMonitor.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="LanClient.cpp">
@@ -111,6 +117,12 @@
       <Filter>소스 파일</Filter>
     </ClCompile>
     <ClCompile Include="NetCommon.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="ProcessMonitor.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="ProcessorMonitor.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
   </ItemGroup>

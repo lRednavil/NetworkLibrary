@@ -167,6 +167,8 @@
     <ClInclude Include="NetCommon.h" />
     <ClInclude Include="NetServer.h" />
     <ClInclude Include="pch.h" />
+    <ClInclude Include="ProcessMonitor.h" />
+    <ClInclude Include="ProcessorMonitor.h" />
     <ClInclude Include="RingBuffer.h" />
     <ClInclude Include="SerializedBuffer.h" />
     <ClInclude Include="TLSMemoryPool.h" />
@@ -190,6 +192,8 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="ProcessMonitor.cpp" />
+    <ClCompile Include="ProcessorMonitor.cpp" />
     <ClCompile Include="RingBuffer.cpp" />
     <ClCompile Include="SerialzedBuffer.cpp" />
   </ItemGroup>
