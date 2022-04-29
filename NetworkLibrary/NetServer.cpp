@@ -28,6 +28,9 @@ bool CNetServer::Start(WCHAR* IP, DWORD port, DWORD createThreads, DWORD running
         return false;
     }
 
+    myMonitor = new CProcessMonitor;
+    totalMonitor = new CProcessorMonitor;
+
     return true;
 }
 
@@ -53,6 +56,20 @@ void CNetServer::Monitor()
     wprintf_s(L"Recv TPS : %llu \n", totalRecv - lastRecv);
     wprintf_s(L"=============================\n");
     wprintf_s(L"Current Sessions : %lu \n", sessionCnt);
+
+    myMonitor->UpdateProcessTime();
+    totalMonitor->UpdateHardwareTime();
+    
+    wprintf_s(L"======== Process Information ========\n");
+    wprintf_s(L"CPU Total : %f%% || User Total : %f%% || Kernel Total : %f%% \nPrivate Bytes : %lld Mb \n", myMonitor->ProcessTotal(), myMonitor->ProcessUser(), myMonitor->ProcessKernel(), myMonitor->ProcessPrivateBytes() / 1024 / 1024);
+
+
+    wprintf_s(L"======== Processor Information ========\n");
+    wprintf_s(L"CPU Total : %f%% || User Total : %f%% || Kernel Total : %f%% \n", totalMonitor->ProcessorTotal(), totalMonitor->ProcessorUser(), totalMonitor->ProcessorKernel());
+
+    wprintf_s(L"======== Ethernet Information ========\n");
+    wprintf_s(L"Total Recv Bytes : %lf Kb || Total Send Bytes : %lf Kb \nRecv Bytes/sec : %lf Kb || Send Bytes/sec : %lf Kb\n", totalMonitor->EthernetRecv() / 1024, totalMonitor->EthernetSend() / 1024, totalMonitor->EthernetRecvTPS() / 1024, totalMonitor->EthernetSendTPS() / 1024);
+
 
     lastAccept = totalAccept;
     lastSend = totalSend;
