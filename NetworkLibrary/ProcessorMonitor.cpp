@@ -1,3 +1,4 @@
+#include "pch.h"
 #include "ProcessorMonitor.h"
 #include "ProcessMonitor.h"
 #include <iostream>
@@ -135,16 +136,25 @@ void CProcessorMonitor::UpdateHardwareTime()
 	PdhCollectQueryData(myQuery);
 	PDH_STATUS status;
 
+	tps_Network_RecvBytes = 0;
+	tps_Network_SendBytes = 0;
+
 	for (int iCnt = 0; iCnt < df_PDH_ETHERNET_MAX; iCnt++)
 	{
 		if (_EthernetStruct[iCnt]._bUse)
 		{
 			status = PdhGetFormattedCounterValue(_EthernetStruct[iCnt]._pdh_Counter_Network_RecvBytes,
 				PDH_FMT_DOUBLE, NULL, &counterVal);
-			if (status == 0) _pdh_value_Network_RecvBytes += counterVal.doubleValue;
+			if (status == 0) {
+				_pdh_value_Network_RecvBytes += counterVal.doubleValue;
+				tps_Network_RecvBytes += counterVal.doubleValue;
+			}
 			status = PdhGetFormattedCounterValue(_EthernetStruct[iCnt]._pdh_Counter_Network_SendBytes,
 				PDH_FMT_DOUBLE, NULL, &counterVal);
-			if (status == 0) _pdh_value_Network_SendBytes += counterVal.doubleValue;
+			if (status == 0) {
+				_pdh_value_Network_SendBytes += counterVal.doubleValue;
+				tps_Network_SendBytes += counterVal.doubleValue;
+			}
 		}
 	}
 

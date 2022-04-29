@@ -1,6 +1,8 @@
+#include "pch.h"
 #include "ProcessMonitor.h"
 
 #include <Pdh.h>
+#include <Psapi.h>
 
 #pragma comment(lib,"Pdh.lib")
 
@@ -18,6 +20,14 @@ CProcessMonitor::CProcessMonitor(HANDLE hProcess)
 	if (status != ERROR_SUCCESS) {
 		abort();
 	}
+
+	WCHAR queryStr[MAX_PATH];
+	WCHAR processName[MAX_PATH];
+	DWORD bufSize = MAX_PATH;
+
+	QueryFullProcessImageName(_hProcess, NULL, processName, &bufSize);
+	//swprintf_s(queryStr, L"\\Process(*)\\Private Bytes", processName);
+
 	//------------------------------------------------------------------
 	// 프로세서 개수를 확인한다.
 	//
@@ -35,7 +45,7 @@ CProcessMonitor::CProcessMonitor(HANDLE hProcess)
 	_ftProcess_LastKernel.QuadPart = 0;
 	_ftProcess_LastTime.QuadPart = 0;
 
-	PdhAddCounter(myQuery, L"\\Process(*)\\Private Bytes", NULL, &privateBytes);
+	PdhAddCounter(myQuery, L"\\Process(*)\\Working Set", NULL, &privateBytes);
 
 	UpdateProcessTime();
 }
@@ -100,10 +110,8 @@ void CProcessMonitor::UpdateProcessTime()
 	_ftProcess_LastUser = User;
 
 	//메모리 수치 전담
-	PDH_FMT_COUNTERVALUE counterVal;
-	PdhCollectQueryData(myQuery);
+	PROCESS_MEMORY_COUNTERS_EX pmCounter;
+	GetProcessMemoryInfo(_hProcess, (PROCESS_MEMORY_COUNTERS*)&pmCounter, sizeof(pmCounter));
 
-	PDH_STATUS status;
-	status = PdhGetFormattedCounterValue(privateBytes, PDH_FMT_LARGE, NULL, &counterVal);
-	privateBytesVal = counterVal.largeValue;
+	privateBytesVal = pmCounter.PrivateUsage;
 }

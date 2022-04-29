@@ -29,6 +29,9 @@
 #include "LockFreeStack.h"
 #include "TLSMemoryPool.h"
 
+#include "ProcessMonitor.h"
+#include "ProcessorMonitor.h"
+
 extern CTLSMemoryPool<CPacket> g_PacketPool;
 
 #endif //PCH_H
