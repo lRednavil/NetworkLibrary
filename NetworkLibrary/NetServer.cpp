@@ -528,13 +528,18 @@ unsigned int __stdcall CNetServer::TimerProc(void* arg)
 {
     CNetServer* server = (CNetServer*)arg;
     SESSION* session;
+    char fence;
     int cnt;
+    //초기오류 방지구간
+    server->currentTime = timeGetTime();
+    Sleep(10000);
+
     while (server->isServerOn) {
         server->currentTime = timeGetTime();
         
         for (cnt = 0; cnt < server->maxConnection; ++cnt) {
             session = &server->sessionArr[cnt];
-
+            
             if (session->ioCnt & RELEASE_FLAG) continue;
 
             if (server->currentTime - session->lastTime >= session->timeOutVal) {
