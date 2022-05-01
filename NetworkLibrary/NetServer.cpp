@@ -22,14 +22,14 @@ bool CNetServer::Start(WCHAR* IP, DWORD port, DWORD createThreads, DWORD running
         sessionStack.Push(cnt);
     }
 
+    myMonitor = new CProcessMonitor;
+    totalMonitor = new CProcessorMonitor;
+
     if (ThreadInit(createThreads, runningThreads) == false) {
         isServerOn = false;
         sessionStack.~CLockFreeStack();
         return false;
     }
-
-    myMonitor = new CProcessMonitor;
-    totalMonitor = new CProcessorMonitor;
 
     return true;
 }
