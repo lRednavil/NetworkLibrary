@@ -539,7 +539,8 @@ unsigned int __stdcall CNetServer::TimerProc(void* arg)
         
         for (cnt = 0; cnt < server->maxConnection; ++cnt) {
             session = &server->sessionArr[cnt];
-            
+            //memory fence
+            InterlockedOr8(&fence, 0);
             if (session->ioCnt & RELEASE_FLAG) continue;
 
             if (server->currentTime - session->lastTime >= session->timeOutVal) {
