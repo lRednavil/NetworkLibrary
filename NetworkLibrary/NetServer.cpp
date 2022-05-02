@@ -143,6 +143,12 @@ void CNetServer::Encode(CPacket* packet)
 {
     if (packet->isEncoded) return;
     
+    AcquireSRWLockExclusive(&packet->encodeLock);
+    if (packet->isEncoded) {
+        ReleaseSRWLockExclusive(&packet->encodeLock);
+        return;
+    }
+    
     packet->isEncoded = true;
 
     NET_HEADER* header = (NET_HEADER*)packet->GetBufferPtr();
@@ -162,6 +168,8 @@ void CNetServer::Encode(CPacket* packet)
     for (cnt = 1; cnt <= len; ++cnt) {
         ptr[cnt] ^= ptr[cnt - 1] + key + cnt + 1;
     }
+
+    ReleaseSRWLockExclusive(&packet->encodeLock);
 }
 
 void CNetServer::Decode(CPacket* packet)

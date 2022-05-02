@@ -215,6 +215,8 @@ protected:
 	char* _buffer;
 	bool isEncoded;
 
+	SRWLOCK encodeLock;
+
 	int	_bufferSize;
 
 	int _head = 0;
