@@ -248,9 +248,7 @@ bool CLanServer::MakeSession(WCHAR* IP, SOCKET sock, DWORD64* ID)
 
     session = &sessionArr[sessionID_high];
 
-    session->sock = sock;
-    session->ioCnt &= ~RELEASE_FLAG;
-    
+    session->sock = sock;    
 
     wmemmove_s(session->IP, 16, IP, 16);
     session->sessionID = *ID = sessionID;
@@ -267,6 +265,7 @@ bool CLanServer::MakeSession(WCHAR* IP, SOCKET sock, DWORD64* ID)
         return false;
     }
 
+    session->ioCnt &= ~RELEASE_FLAG;
     InterlockedIncrement(&sessionCnt);
     //recv start
     InterlockedIncrement(&session->ioCnt);
@@ -332,38 +331,39 @@ unsigned int __stdcall CLanServer::WorkProc(void* arg)
         }
 
         session = server->AcquireSession(sessionID);
-        
-        if (session != NULL) {
-			//recvd
-			if (overlap->type == 0) {
-				if (ret == false || bytes == 0) {
-					server->Disconnect(sessionID);
-				}
-				else
-				{
-					session->recvQ.MoveRear(bytes);
-                    //추가 recv에 맞춘 acquire
-                    server->AcquireSession(sessionID);
-                    server->RecvProc(session);
-				}
 
-			}
-			//sent
-			if (overlap->type == 1) {
-				while (session->sendCnt) {
-					--session->sendCnt;
-                    server->PacketFree(session->sendBuf[session->sendCnt]);
-				}
-				InterlockedExchange8((char*)&session->isSending, 0);
-                if (ret != false) {
-                    //추가로 send에 맞춘 acquire
-                    server->AcquireSession(sessionID);
-                    server->SendPost(session);
-                }
-			}
-            //작업 완료에 대한 lose
-            server->LoseSession(session);
+        if (session == NULL) {
+            continue;
         }
+        //recvd
+        if (overlap->type == 0) {
+            if (ret == false || bytes == 0) {
+                server->Disconnect(sessionID);
+            }
+            else
+            {
+                session->recvQ.MoveRear(bytes);
+                //추가 recv에 맞춘 acquire
+                server->AcquireSession(sessionID);
+                server->RecvProc(session);
+            }
+
+        }
+        //sent
+        if (overlap->type == 1) {
+            while (session->sendCnt) {
+                --session->sendCnt;
+                server->PacketFree(session->sendBuf[session->sendCnt]);
+            }
+            InterlockedExchange8((char*)&session->isSending, 0);
+            if (ret != false) {
+                //추가로 send에 맞춘 acquire
+                server->AcquireSession(sessionID);
+                server->SendPost(session);
+            }
+        }
+        //작업 완료에 대한 lose
+        server->LoseSession(session);
 
         //gqcs 후 session의 acquire에 대한 해제
         server->LoseSession(session);
