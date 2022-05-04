@@ -455,7 +455,8 @@ unsigned int __stdcall CNetServer::WorkProc(void* arg)
             continue;
         }
 
-        session = server->AcquireSession(sessionID);
+        //session = server->AcquireSession(sessionID);
+        session = server->FindSession(sessionID);
 
         if (session == NULL) {
             continue;
@@ -490,8 +491,8 @@ unsigned int __stdcall CNetServer::WorkProc(void* arg)
 		//작업 완료에 대한 lose
 		server->LoseSession(session);
 
-        //gqcs 후 session의 acquire에 대한 해제
-        server->LoseSession(session);
+        ////gqcs 후 session의 acquire에 대한 해제
+        //server->LoseSession(session);
 	}
 
 
@@ -547,7 +548,6 @@ unsigned int __stdcall CNetServer::TimerProc(void* arg)
         
         for (cnt = 0; cnt < server->maxConnection; ++cnt) {
             session = &server->sessionArr[cnt];
-            
             if (session->ioCnt & RELEASE_FLAG) continue;
 
             if (server->currentTime - session->lastTime >= session->timeOutVal) {
