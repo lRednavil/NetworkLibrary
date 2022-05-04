@@ -426,7 +426,7 @@ void CNetServer::ReleaseSession(SESSION* session)
     InterlockedExchange8((char*)&session->isSending, false);
     InterlockedDecrement(&sessionCnt);
 
-    sessionStack.Push(session->sessionID >> MASK_SHIFT);
+    PostQueuedCompletionStatus(hIOCP, -1, NULL, NULL);
 }
 
 unsigned int __stdcall CNetServer::WorkProc(void* arg)
@@ -462,6 +462,7 @@ unsigned int __stdcall CNetServer::WorkProc(void* arg)
         //disconnectÀÇ °æ¿ì
         if (bytes == -1) {
             server->OnClientLeave(sessionID);
+            server->sessionStack.Push(session->sessionID >> MASK_SHIFT);
             continue;
         }
 
