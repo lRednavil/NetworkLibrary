@@ -552,10 +552,7 @@ unsigned int __stdcall CNetServer::TimerProc(void* arg)
         
         for (cnt = 0; cnt < server->maxConnection; ++cnt) {
             session = &server->sessionArr[cnt];
-<<<<<<< HEAD
-            
-=======
->>>>>>> 0877409 (acquire ?€??findë¡?ë°”ê¿ˆ)
+
             if (session->ioCnt & RELEASE_FLAG) continue;
 
             if (server->currentTime - session->lastTime >= session->timeOutVal) {
