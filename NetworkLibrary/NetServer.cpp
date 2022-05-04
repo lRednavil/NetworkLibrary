@@ -410,8 +410,6 @@ void CNetServer::ReleaseSession(SESSION* session)
 
     closesocket(sock);
 
-    OnClientLeave(session->sessionID);
-
     //³²Àº Q Âî²¨±â Á¦°Å
     while (session->sendQ.Dequeue(&packet))
     {
@@ -461,6 +459,12 @@ unsigned int __stdcall CNetServer::WorkProc(void* arg)
         if (session == NULL) {
             continue;
         }
+        //disconnectÀÇ °æ¿ì
+        if (bytes == -1) {
+            server->OnClientLeave(sessionID);
+            continue;
+        }
+
 		//recvd
 		if (overlap->type == 0) {
 			if (ret == false || bytes == 0) {
@@ -548,6 +552,10 @@ unsigned int __stdcall CNetServer::TimerProc(void* arg)
         
         for (cnt = 0; cnt < server->maxConnection; ++cnt) {
             session = &server->sessionArr[cnt];
+<<<<<<< HEAD
+            
+=======
+>>>>>>> 0877409 (acquire ?€??findë¡?ë°”ê¿ˆ)
             if (session->ioCnt & RELEASE_FLAG) continue;
 
             if (server->currentTime - session->lastTime >= session->timeOutVal) {
