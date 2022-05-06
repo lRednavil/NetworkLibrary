@@ -402,8 +402,6 @@ void CNetServer::ReleaseSession(SESSION* session)
 
     closesocket(sock);
 
-    OnClientLeave(session->sessionID);
-
     //³²Àº Q Âî²¨±â Á¦°Å
     while (session->sendQ.Dequeue(&packet))
     {
@@ -420,7 +418,7 @@ void CNetServer::ReleaseSession(SESSION* session)
     InterlockedExchange8((char*)&session->isSending, false);
     InterlockedDecrement(&sessionCnt);
 
-    sessionStack.Push(session->sessionID >> MASK_SHIFT);
+    PostQueuedCompletionStatus(hIOCP, 0, session->sessionID, (LPOVERLAPPED)2);
 }
 
 unsigned int __stdcall CNetServer::WorkProc(void* arg)
@@ -453,6 +451,13 @@ unsigned int __stdcall CNetServer::WorkProc(void* arg)
         if (session == NULL) {
             continue;
         }
+        //disconnectÀÇ °æ¿ì
+        if ((__int64)overlap == 2) {
+            server->OnClientLeave(sessionID);
+            server->sessionStack.Push(session->sessionID >> MASK_SHIFT);
+            continue;
+        }
+
 		//recvd
 		if (overlap->type == 0) {
 			if (ret == false || bytes == 0) {
@@ -540,6 +545,7 @@ unsigned int __stdcall CNetServer::TimerProc(void* arg)
         
         for (cnt = 0; cnt < server->maxConnection; ++cnt) {
             session = &server->sessionArr[cnt];
+
             if (session->ioCnt & RELEASE_FLAG) continue;
 
             if (server->currentTime - session->lastTime >= session->timeOutVal) {
