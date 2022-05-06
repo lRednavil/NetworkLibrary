@@ -426,7 +426,7 @@ void CNetServer::ReleaseSession(SESSION* session)
     InterlockedExchange8((char*)&session->isSending, false);
     InterlockedDecrement(&sessionCnt);
 
-    PostQueuedCompletionStatus(hIOCP, -1, session->sessionID, NULL);
+    PostQueuedCompletionStatus(hIOCP, 0, session->sessionID, (LPOVERLAPPED)2);
 }
 
 unsigned int __stdcall CNetServer::WorkProc(void* arg)
@@ -460,7 +460,7 @@ unsigned int __stdcall CNetServer::WorkProc(void* arg)
             continue;
         }
         //disconnectÀÇ °æ¿ì
-        if (bytes == -1) {
+        if ((__int64)overlap == 2) {
             server->OnClientLeave(sessionID);
             server->sessionStack.Push(session->sessionID >> MASK_SHIFT);
             continue;
