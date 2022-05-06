@@ -379,14 +379,8 @@ bool CNetServer::MakeSession(WCHAR* IP, SOCKET sock, DWORD64* ID)
     }
 
     session->lastTime = currentTime;
-
-    //recv용 ioCount증가
-    InterlockedIncrement(&session->ioCnt);
-    session->ioCnt &= ~RELEASE_FLAG;
-
-    InterlockedIncrement(&sessionCnt);
-    //recv start
-    return RecvPost(session);
+    
+    return true;
 }
 
 void CNetServer::ReleaseSession(SESSION* session)
@@ -503,6 +497,7 @@ unsigned int __stdcall CNetServer::AcceptProc(void* arg)
     WCHAR IP[16];
 
     CNetServer* server = (CNetServer*)arg;
+    SESSION* session;
     DWORD64 sessionID;
 
     while (server->isServerOn) {
@@ -521,10 +516,23 @@ unsigned int __stdcall CNetServer::AcceptProc(void* arg)
 
         if (server->MakeSession(IP, sock, &sessionID) == false) {
             closesocket(sock);
+            server->sessionStack.Push(sessionID >> MASK_SHIFT);
             continue;
         }
+        
+        session = server->FindSession(sessionID);
+        //recv용 ioCount증가
+        InterlockedIncrement(&session->ioCnt);
+        session->ioCnt &= ~RELEASE_FLAG;
 
-        server->OnClientJoin(sessionID);
+        if (server->OnClientJoin(sessionID) == false) {
+            server->LoseSession(session);
+            continue;
+        }
+        
+        InterlockedIncrement(&server->sessionCnt);
+
+        server->RecvPost(session);
     }
 
     return 0;
