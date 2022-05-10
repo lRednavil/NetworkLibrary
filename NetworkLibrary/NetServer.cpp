@@ -611,8 +611,8 @@ void CNetServer::RecvProc(SESSION* session)
             g_PacketPool.Free(packet);
             OnError(-1, L"Packet Code Error");
             //헤드코드 변조시 접속 제거
-            LoseSession(session);
             Disconnect(session->sessionID);
+            LoseSession(session);
             return;
         }
 
@@ -624,8 +624,8 @@ void CNetServer::RecvProc(SESSION* session)
             g_PacketPool.Free(packet);
             OnError(-1, L"Packet CheckSum Error");
             //체크섬 변조시 접속 제거
-            LoseSession(session);
             Disconnect(session->sessionID);
+            LoseSession(session);
             return;
         }
         //사용전 net헤더 스킵
