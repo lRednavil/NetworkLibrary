@@ -522,8 +522,8 @@ unsigned int __stdcall CNetServer::AcceptProc(void* arg)
         
         session = server->FindSession(sessionID);
         //recv용 ioCount증가
-        InterlockedIncrement(&session->ioCnt);
-        session->ioCnt &= ~RELEASE_FLAG;
+        //InterlockedIncrement(&session->ioCnt);
+        InterlockedAnd64((__int64*)&session->ioCnt, ~RELEASE_FLAG);
 
         if (server->OnClientJoin(sessionID) == false) {
             server->LoseSession(session);
@@ -609,8 +609,9 @@ void CNetServer::RecvProc(SESSION* session)
         if (netHeader.staticCode != STATIC_CODE) {
             packet->SubRef();
             g_PacketPool.Free(packet);
-            OnError(-1, L"Packet CheckSum Error");
+            OnError(-1, L"Packet Code Error");
             //헤드코드 변조시 접속 제거
+            LoseSession(session);
             Disconnect(session->sessionID);
             return;
         }
@@ -623,6 +624,7 @@ void CNetServer::RecvProc(SESSION* session)
             g_PacketPool.Free(packet);
             OnError(-1, L"Packet CheckSum Error");
             //체크섬 변조시 접속 제거
+            LoseSession(session);
             Disconnect(session->sessionID);
             return;
         }
