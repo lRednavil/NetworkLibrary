@@ -584,13 +584,9 @@ void CNetServer::RecvProc(SESSION* session)
     session->lastTime = currentTime;
 
     for (;;) {
-        packet = PacketAlloc();
-
         len = recvQ->GetUsedSize();
         //길이 판별
         if (sizeof(netHeader) > len) {
-            packet->SubRef();
-            g_PacketPool.Free(packet);
             break;
         }
 
@@ -599,10 +595,10 @@ void CNetServer::RecvProc(SESSION* session)
 
         //길이 판별
         if (sizeof(netHeader) + netHeader.len > len) {
-            packet->SubRef();
-            g_PacketPool.Free(packet);
             break;
         }
+
+        packet = PacketAlloc();
 
         InterlockedIncrement(&totalRecv);
 
