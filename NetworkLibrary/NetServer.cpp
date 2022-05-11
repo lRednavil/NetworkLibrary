@@ -501,9 +501,10 @@ unsigned int __stdcall CNetServer::AcceptProc(void* arg)
     CNetServer* server = (CNetServer*)arg;
     SESSION* session;
     DWORD64 sessionID;
+    int addrLen = sizeof(addr);
 
     while (server->isServerOn) {
-        sock = accept(server->listenSock, (sockaddr*)&addr, NULL);
+        sock = accept(server->listenSock, (sockaddr*)&addr, &addrLen);
         ++server->totalAccept;
         if (sock == INVALID_SOCKET) {
             continue;
