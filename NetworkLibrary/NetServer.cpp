@@ -579,6 +579,8 @@ void CNetServer::RecvProc(SESSION* session)
     CRingBuffer* recvQ = &session->recvQ;
     CPacket* packet;
 
+    WCHAR errText[100];
+
     session->lastTime = currentTime;
 
     for (;;) {
@@ -611,7 +613,8 @@ void CNetServer::RecvProc(SESSION* session)
         if (netHeader.staticCode != STATIC_CODE) {
             packet->SubRef();
             g_PacketPool.Free(packet);
-            OnError(-1, L"Packet Code Error");
+            swprintf_s(errText, L"%s %s", L"Packet Code Error", session->IP);
+            OnError(-1, errText);
             //헤드코드 변조시 접속 제거
             Disconnect(session->sessionID);
             LoseSession(session);
@@ -624,7 +627,8 @@ void CNetServer::RecvProc(SESSION* session)
         if (header->checkSum != MakeCheckSum(packet)) {
             packet->SubRef();
             g_PacketPool.Free(packet);
-            OnError(-1, L"Packet CheckSum Error");
+            swprintf_s(errText, L"%s %s", L"Packet Code Error", session->IP);
+            OnError(-1, errText);
             //체크섬 변조시 접속 제거
             Disconnect(session->sessionID);
             LoseSession(session);
