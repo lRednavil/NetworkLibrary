@@ -50,10 +50,12 @@ void CNetServer::Monitor()
     wprintf_s(L"Total Accept : %llu \n", totalAccept);
     wprintf_s(L"Total Send : %llu \n", totalSend);
     wprintf_s(L"Total Recv : %llu \n", totalRecv);
+    wprintf_s(L"Total Release : %llu \n", totalRelease);
     wprintf_s(L"=============================\n");
     wprintf_s(L"Accept TPS : %llu \n", totalAccept - lastAccept);
     wprintf_s(L"Send TPS : %llu \n", totalSend - lastSend);
     wprintf_s(L"Recv TPS : %llu \n", totalRecv - lastRecv);
+    wprintf_s(L"Release TPS : %llu \n", totalRelease - lastRelease);
     wprintf_s(L"=============================\n");
     wprintf_s(L"Current Sessions : %lu \n", sessionCnt);
 
@@ -74,6 +76,7 @@ void CNetServer::Monitor()
     lastAccept = totalAccept;
     lastSend = totalSend;
     lastRecv = totalRecv;
+    lastRelease = totalRelease;
 }
 
 bool CNetServer::Disconnect(DWORD64 sessionID)
@@ -83,7 +86,12 @@ bool CNetServer::Disconnect(DWORD64 sessionID)
         return false;
     }
 
-    CancelIoEx((HANDLE)session->sock, NULL);
+    if (InterlockedExchange8((char*)&session->isAlive, 0) == true) {
+        CancelIoEx((HANDLE)session->sock, NULL);
+        closesocket(session->sock);
+        session->sock = INVALID_SOCKET;
+    }
+
     LoseSession(session);
     return true;
 }
@@ -370,7 +378,7 @@ bool CNetServer::MakeSession(WCHAR* IP, SOCKET sock, DWORD64* ID)
     ZeroMemory(&session->sendOver, sizeof(session->sendOver));
     session->sendOver.type = 1;
 
-    session->recvQ.ClearBuffer();
+    InterlockedExchange8((char*)&session->isAlive, 1);
 
     //iocp match
     h = CreateIoCompletionPort((HANDLE)session->sock, hIOCP, (ULONG_PTR)sessionID, 0);
@@ -398,6 +406,8 @@ void CNetServer::ReleaseSession(SESSION* session)
 
     closesocket(sock);
 
+    InterlockedIncrement64((__int64*)&totalRelease);
+
     //³²Àº Q Âî²¨±â Á¦°Å
     while (session->sendQ.Dequeue(&packet))
     {
@@ -410,6 +420,8 @@ void CNetServer::ReleaseSession(SESSION* session)
         PacketFree(packet);
     }
     session->sendCnt = 0;
+
+    session->recvQ.ClearBuffer();
 
     InterlockedExchange8((char*)&session->isSending, false);
     InterlockedDecrement(&sessionCnt);
@@ -466,7 +478,7 @@ unsigned int __stdcall CNetServer::WorkProc(void* arg)
 				server->AcquireSession(sessionID);
 				server->RecvProc(session);
 			}
-
+            InterlockedExchange8((char*)&session->isRecving, false);
 		}
 		//sent
 		if (overlap->type == 1) {
@@ -657,6 +669,7 @@ bool CNetServer::RecvPost(SESSION* session)
     pBuf[1] = { recvQ->GetFreeSize() - len, recvQ->GetBufferPtr() };
 
     ret = WSARecv(session->sock, pBuf, 2, NULL, &flag, (LPWSAOVERLAPPED)&session->recvOver, NULL);
+    InterlockedExchange8((char*)&session->isRecving, true);
 
     if (ret == SOCKET_ERROR) {
         err = WSAGetLastError();
