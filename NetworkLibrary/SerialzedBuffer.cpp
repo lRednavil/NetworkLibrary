@@ -183,7 +183,7 @@ CPacket& CPacket::operator>>(double& dValue)
 
 int CPacket::GetData(char* chpDest, int iSize)
 {
-    if (iSize > _bufferSize) return -1;
+    if (iSize > _bufferSize - _rear) return -1;
 
     int ret;
     ret = memmove_s(chpDest, iSize, _buffer + _head, iSize);
@@ -196,7 +196,7 @@ int CPacket::GetData(char* chpDest, int iSize)
 
 int CPacket::PutData(char* chpSrc, int iSrcSize)
 {
-    if (iSrcSize > _bufferSize) return -1;
+    if (iSrcSize > _bufferSize - _rear) return -1;
 
     int ret;
     ret = memmove_s(_buffer + _rear, iSrcSize, chpSrc, iSrcSize);

@@ -25,8 +25,6 @@ struct SESSION {
 	//session refCnt의 역할
 	DWORD64 ioCnt;
 	bool isSending;
-	bool isRecving;
-	volatile bool isAlive;
 
 	//네트워크 메세지용 버퍼들
 	CRingBuffer recvQ;
@@ -48,7 +46,6 @@ struct SESSION {
 
 	SESSION() {
 		ioCnt = RELEASE_FLAG;
-		isAlive = false;
 	}
 };
 
