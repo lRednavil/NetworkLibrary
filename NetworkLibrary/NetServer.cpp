@@ -115,6 +115,7 @@ CPacket* CNetServer::PacketAlloc()
     packet->Clear();
     packet->MoveWritePos(sizeof(NET_HEADER));
     packet->isEncoded = false;
+
     return packet;
 }
 
@@ -612,6 +613,7 @@ void CNetServer::RecvProc(SESSION* session)
 
         //길이 판별
         if (sizeof(netHeader) + netHeader.len > len) {
+            PacketFree(packet);
             break;
         }
 
