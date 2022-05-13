@@ -375,15 +375,23 @@ bool CNetServer::MakeSession(WCHAR* IP, SOCKET sock, DWORD64* ID)
     ZeroMemory(&session->sendOver, sizeof(session->sendOver));
     session->sendOver.type = 1;
 
+    session->lastTime = currentTime;
+
+    //recv용 ioCount증가
+    InterlockedIncrement(&session->ioCnt);
+    InterlockedAnd64((__int64*)&session->ioCnt, ~RELEASE_FLAG);
+
     //iocp match
     h = CreateIoCompletionPort((HANDLE)session->sock, hIOCP, (ULONG_PTR)sessionID, 0);
     if (h != hIOCP) {
         _LOG(LOG_LEVEL_SYSTEM, L"IOCP to SOCKET Failed");
         OnError(-1, L"IOCP to SOCKET Failed");
+        //crash 용도
+        ID = 0;
+        *ID = 0;
         return false;
     }
 
-    session->lastTime = currentTime;
     
     return true;
 }
@@ -463,7 +471,7 @@ unsigned int __stdcall CNetServer::WorkProc(void* arg)
 		//recvd
 		if (overlap->type == 0) {
 			if (ret == false || bytes == 0) {
-				server->Disconnect(sessionID);
+				//server->Disconnect(sessionID);
 			}
 			else
 			{
@@ -522,14 +530,10 @@ unsigned int __stdcall CNetServer::AcceptProc(void* arg)
 
         if (server->MakeSession(IP, sock, &sessionID) == false) {
             closesocket(sock);
-            server->sessionStack.Push(sessionID >> MASK_SHIFT);
             continue;
         }
         
         session = server->FindSession(sessionID);
-        //recv용 ioCount증가
-        InterlockedIncrement(&session->ioCnt);
-        InterlockedAnd64((__int64*)&session->ioCnt, ~RELEASE_FLAG);
 
         if (server->OnClientJoin(sessionID) == false) {
             server->LoseSession(session);
