@@ -4,7 +4,6 @@
 CPacket::CPacket() : _bufferSize(eBUFFER_DEFAULT)
 {
     _buffer = (char*)malloc(eBUFFER_DEFAULT);
-    InitializeSRWLock(&encodeLock);
 }
 
 CPacket::CPacket(int size) : _bufferSize(size)
