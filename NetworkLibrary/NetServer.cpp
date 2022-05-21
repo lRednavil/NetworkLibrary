@@ -108,6 +108,23 @@ bool CNetServer::SendPacket(DWORD64 sessionID, CPacket* packet)
     return true;
 }
 
+bool CNetServer::SendAndDisconnect(DWORD64 sessionID, CPacket* packet)
+{
+    SESSION* session = AcquireSession(sessionID);
+
+    if (session == NULL) {
+        PacketFree(packet);
+        return false;
+    }
+
+    HeaderAlloc(packet);
+    Encode(packet);
+    session->sendQ.Enqueue(packet);
+    SendPost(session);
+    SetTimeOut(sessionID, 1000);
+    return true;
+}
+
 CPacket* CNetServer::PacketAlloc()
 {
     CPacket* packet = g_PacketPool.Alloc();
@@ -356,6 +373,7 @@ bool CNetServer::MakeSession(WCHAR* IP, SOCKET sock, DWORD64* ID)
     HANDLE h;
 
     if (sessionStack.Pop(&sessionID_high) == false) {
+        _FILE_LOG(LOG_LEVEL_SYSTEM, L"LibraryLog", L"All Session is in Use");
         OnError(-1, L"All Session is in Use");
         return false;
     }
@@ -385,7 +403,7 @@ bool CNetServer::MakeSession(WCHAR* IP, SOCKET sock, DWORD64* ID)
     //iocp match
     h = CreateIoCompletionPort((HANDLE)session->sock, hIOCP, (ULONG_PTR)sessionID, 0);
     if (h != hIOCP) {
-        _LOG(LOG_LEVEL_SYSTEM, L"IOCP to SOCKET Failed");
+        _FILE_LOG(LOG_LEVEL_ERROR, L"LibraryLog", L"IOCP to SOCKET Failed");
         OnError(-1, L"IOCP to SOCKET Failed");
         //crash 용도
         ID = 0;
@@ -453,7 +471,9 @@ unsigned int __stdcall CNetServer::WorkProc(void* arg)
         //case totally failed
         if (overlap == NULL) {
             err = WSAGetLastError();
+            _FILE_LOG(LOG_LEVEL_ERROR, L"LibraryLog", L"GQCS return NULL ovelap");
             server->OnError(err, L"GQCS return NULL ovelap");
+
             continue;
         }
 
@@ -557,7 +577,7 @@ unsigned int __stdcall CNetServer::TimerProc(void* arg)
     int cnt;
     //초기오류 방지구간
     server->currentTime = timeGetTime();
-    Sleep(10000);
+    Sleep(1000);
 
     while (server->isServerOn) {
         server->currentTime = timeGetTime();
@@ -606,6 +626,7 @@ void CNetServer::RecvProc(SESSION* session)
         if (netHeader.len > packet->GetBufferSize()) {
             Disconnect(session->sessionID);
             PacketFree(packet);
+            _FILE_LOG(LOG_LEVEL_ERROR, L"LibraryLog", L"Unacceptable Length from %S", session->IP);
             OnError(-1, L"Unacceptable Length");
             LoseSession(session);
             return;
@@ -627,6 +648,7 @@ void CNetServer::RecvProc(SESSION* session)
         if (netHeader.staticCode != STATIC_CODE) {
             PacketFree(packet);
             swprintf_s(errText, L"%s %s", L"Packet Code Error", session->IP);
+            _FILE_LOG(LOG_LEVEL_ERROR, L"LibraryLog", L"Packet Code Error from %S", session->IP);
             OnError(-1, errText);
             //헤드코드 변조시 접속 제거
             Disconnect(session->sessionID);
@@ -640,6 +662,7 @@ void CNetServer::RecvProc(SESSION* session)
         if (header->checkSum != MakeCheckSum(packet)) {
             PacketFree(packet);
             swprintf_s(errText, L"%s %s", L"Packet Code Error", session->IP);
+            _FILE_LOG(LOG_LEVEL_ERROR, L"LibraryLog", L"Packet Checksum Error from %S", session->IP);
             OnError(-1, errText);
             //체크섬 변조시 접속 제거
             Disconnect(session->sessionID);
@@ -693,6 +716,7 @@ bool CNetServer::RecvPost(SESSION* session)
             case 10064:
                 break;
             default:
+                _FILE_LOG(LOG_LEVEL_ERROR, L"LibraryLog", L"RecvPost Error %d", err);
                 OnError(err, L"RecvPost Error");
             }
             LoseSession(session);
@@ -766,6 +790,7 @@ bool CNetServer::SendPost(SESSION* session)
             case 10064:
                 break;
             default:
+                _FILE_LOG(LOG_LEVEL_ERROR, L"LibraryLog", L"RecvPost Error %d", err);
                 OnError(err, L"SendPost Error");
             }
             LoseSession(session);
