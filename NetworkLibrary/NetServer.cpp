@@ -213,7 +213,7 @@ void CNetServer::PacketFree(CPacket* packet)
     }
 }
 
-void CNetServer::SetTimeOut(DWORD64 sessionID, DWORD timeVal)
+void CNetServer::SetTimeOut(DWORD64 sessionID, DWORD timeVal, bool recvTimeReset)
 {
     SESSION* session = AcquireSession(sessionID);
 
@@ -222,6 +222,7 @@ void CNetServer::SetTimeOut(DWORD64 sessionID, DWORD timeVal)
     }
 
     session->timeOutVal = timeVal;
+    if (recvTimeReset) session->lastTime = currentTime;
     LoseSession(session);
 }
 

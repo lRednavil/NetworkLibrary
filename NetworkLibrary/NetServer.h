@@ -2,8 +2,8 @@
 struct SESSION;
 class CPacket;
 
-class ProcessMonitor;
-class ProcessorMonitor;
+class CProcessMonitor;
+class CProcessorMonitor;
 
 class CNetServer
 {
@@ -23,7 +23,7 @@ public:
 	CPacket* PacketAlloc();
 	void	PacketFree(CPacket* packet);
 
-	void SetTimeOut(DWORD64 sessionID, DWORD timeVal);
+	void SetTimeOut(DWORD64 sessionID, DWORD timeVal, bool recvTimeReset = false);
 
 	//accept 직후, IP filterinig 등의 목적
 	virtual bool OnConnectionRequest(WCHAR* IP, DWORD Port) = 0;
