@@ -32,6 +32,8 @@
 #include "ProcessMonitor.h"
 #include "ProcessorMonitor.h"
 
+#include "ErrorReason.h"
+
 extern CTLSMemoryPool<CPacket> g_PacketPool;
 
 #endif //PCH_H

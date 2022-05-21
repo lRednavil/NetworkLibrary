@@ -108,7 +108,7 @@ bool CNetServer::SendPacket(DWORD64 sessionID, CPacket* packet)
     return true;
 }
 
-bool CNetServer::SendAndDisconnect(DWORD64 sessionID, CPacket* packet)
+bool CNetServer::SendAndDisconnect(DWORD64 sessionID, CPacket* packet, DWORD timeOutVal)
 {
     SESSION* session = AcquireSession(sessionID);
 
@@ -121,7 +121,8 @@ bool CNetServer::SendAndDisconnect(DWORD64 sessionID, CPacket* packet)
     Encode(packet);
     session->sendQ.Enqueue(packet);
     SendPost(session);
-    SetTimeOut(sessionID, 1000);
+    session->isTimeOutReserved = true;
+    SetTimeOut(sessionID, timeOutVal, true);
     return true;
 }
 
@@ -214,7 +215,7 @@ void CNetServer::PacketFree(CPacket* packet)
     }
 }
 
-void CNetServer::SetTimeOut(DWORD64 sessionID, DWORD timeVal)
+void CNetServer::SetTimeOut(DWORD64 sessionID, DWORD timeVal, bool recvTimeReset)
 {
     SESSION* session = AcquireSession(sessionID);
 
@@ -223,6 +224,7 @@ void CNetServer::SetTimeOut(DWORD64 sessionID, DWORD timeVal)
     }
 
     session->timeOutVal = timeVal;
+    if (recvTimeReset) session->lastTime = currentTime;
     LoseSession(session);
 }
 
@@ -394,6 +396,7 @@ bool CNetServer::MakeSession(WCHAR* IP, SOCKET sock, DWORD64* ID)
     ZeroMemory(&session->sendOver, sizeof(session->sendOver));
     session->sendOver.type = 1;
 
+    session->isTimeOutReserved = false;
     session->lastTime = currentTime;
 
     //recv용 ioCount증가
@@ -573,7 +576,6 @@ unsigned int __stdcall CNetServer::TimerProc(void* arg)
 {
     CNetServer* server = (CNetServer*)arg;
     SESSION* session;
-    char fence;
     int cnt;
     //초기오류 방지구간
     server->currentTime = timeGetTime();
@@ -589,7 +591,7 @@ unsigned int __stdcall CNetServer::TimerProc(void* arg)
 
             if (server->currentTime - session->lastTime >= session->timeOutVal) {
                 server->Disconnect(session->sessionID);
-                server->OnTimeOut(session->sessionID);
+                server->OnTimeOut(session->sessionID, session->isTimeOutReserved);
             }
         }
 
@@ -626,7 +628,7 @@ void CNetServer::RecvProc(SESSION* session)
         if (netHeader.len > packet->GetBufferSize()) {
             Disconnect(session->sessionID);
             PacketFree(packet);
-            _FILE_LOG(LOG_LEVEL_ERROR, L"LibraryLog", L"Unacceptable Length from %S", session->IP);
+            _FILE_LOG(LOG_LEVEL_ERROR, L"LibraryLog", L"Unacceptable Length from %s", session->IP);
             OnError(-1, L"Unacceptable Length");
             LoseSession(session);
             return;
@@ -648,7 +650,7 @@ void CNetServer::RecvProc(SESSION* session)
         if (netHeader.staticCode != STATIC_CODE) {
             PacketFree(packet);
             swprintf_s(errText, L"%s %s", L"Packet Code Error", session->IP);
-            _FILE_LOG(LOG_LEVEL_ERROR, L"LibraryLog", L"Packet Code Error from %S", session->IP);
+            _FILE_LOG(LOG_LEVEL_ERROR, L"LibraryLog", L"Packet Code Error from %s", session->IP);
             OnError(-1, errText);
             //헤드코드 변조시 접속 제거
             Disconnect(session->sessionID);
@@ -662,7 +664,7 @@ void CNetServer::RecvProc(SESSION* session)
         if (header->checkSum != MakeCheckSum(packet)) {
             PacketFree(packet);
             swprintf_s(errText, L"%s %s", L"Packet Code Error", session->IP);
-            _FILE_LOG(LOG_LEVEL_ERROR, L"LibraryLog", L"Packet Checksum Error from %S", session->IP);
+            _FILE_LOG(LOG_LEVEL_ERROR, L"LibraryLog", L"Packet Checksum Error from %s", session->IP);
             OnError(-1, errText);
             //체크섬 변조시 접속 제거
             Disconnect(session->sessionID);
