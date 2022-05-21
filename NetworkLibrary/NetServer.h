@@ -36,7 +36,7 @@ public:
 	//메세지 헤더는 알아서 검증할 것
 	virtual void OnRecv(DWORD64 sessionID, CPacket* packet) = 0;
 
-	virtual void OnTimeOut(DWORD64 sessionID) = 0;
+	virtual void OnTimeOut(DWORD64 sessionID, int reason) = 0;
 
 	virtual void OnError(int error, const WCHAR* msg) = 0;
 

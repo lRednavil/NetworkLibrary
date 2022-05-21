@@ -121,6 +121,7 @@ bool CNetServer::SendAndDisconnect(DWORD64 sessionID, CPacket* packet, DWORD tim
     Encode(packet);
     session->sendQ.Enqueue(packet);
     SendPost(session);
+    session->isTimeOutReserved = true;
     SetTimeOut(sessionID, timeOutVal, true);
     return true;
 }
@@ -394,6 +395,7 @@ bool CNetServer::MakeSession(WCHAR* IP, SOCKET sock, DWORD64* ID)
     ZeroMemory(&session->sendOver, sizeof(session->sendOver));
     session->sendOver.type = 1;
 
+    session->isTimeOutReserved = false;
     session->lastTime = currentTime;
 
     //recv¿ë ioCountÁõ°¡
@@ -590,7 +592,7 @@ unsigned int __stdcall CNetServer::TimerProc(void* arg)
 
             if (server->currentTime - session->lastTime >= session->timeOutVal) {
                 server->Disconnect(session->sessionID);
-                server->OnTimeOut(session->sessionID);
+                server->OnTimeOut(session->sessionID, session->isTimeOutReserved);
             }
         }
 
