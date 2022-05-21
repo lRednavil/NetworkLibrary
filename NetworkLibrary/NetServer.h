@@ -17,7 +17,7 @@ public:
 
 	bool Disconnect(DWORD64 sessionID);
 	bool SendPacket(DWORD64 sessionID, CPacket* packet);
-	bool SendAndDisconnect(DWORD64 sessionID, CPacket* packet);
+	bool SendAndDisconnect(DWORD64 sessionID, CPacket* packet, DWORD timeOutVal);
 
 	//기본 참조카운트 1부여 및 초기화 실행
 	CPacket* PacketAlloc();

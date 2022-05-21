@@ -108,7 +108,7 @@ bool CNetServer::SendPacket(DWORD64 sessionID, CPacket* packet)
     return true;
 }
 
-bool CNetServer::SendAndDisconnect(DWORD64 sessionID, CPacket* packet)
+bool CNetServer::SendAndDisconnect(DWORD64 sessionID, CPacket* packet, DWORD timeOutVal)
 {
     SESSION* session = AcquireSession(sessionID);
 
@@ -121,7 +121,7 @@ bool CNetServer::SendAndDisconnect(DWORD64 sessionID, CPacket* packet)
     Encode(packet);
     session->sendQ.Enqueue(packet);
     SendPost(session);
-    SetTimeOut(sessionID, 1000);
+    SetTimeOut(sessionID, timeOutVal, true);
     return true;
 }
 
