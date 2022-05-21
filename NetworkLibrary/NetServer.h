@@ -2,7 +2,8 @@
 struct SESSION;
 class CPacket;
 
-
+class ProcessMonitor;
+class ProcessorMonitor;
 
 class CNetServer
 {
