@@ -2,7 +2,8 @@
 struct SESSION;
 class CPacket;
 
-
+class CProcessMonitor;
+class CProcessorMonitor;
 
 class CNetServer
 {
@@ -16,13 +17,13 @@ public:
 
 	bool Disconnect(DWORD64 sessionID);
 	bool SendPacket(DWORD64 sessionID, CPacket* packet);
-	bool SendAndDisconnect(DWORD64 sessionID, CPacket* packet);
+	bool SendAndDisconnect(DWORD64 sessionID, CPacket* packet, DWORD timeOutVal);
 
 	//기본 참조카운트 1부여 및 초기화 실행
 	CPacket* PacketAlloc();
 	void	PacketFree(CPacket* packet);
 
-	void SetTimeOut(DWORD64 sessionID, DWORD timeVal);
+	void SetTimeOut(DWORD64 sessionID, DWORD timeVal, bool recvTimeReset = false);
 
 	//accept 직후, IP filterinig 등의 목적
 	virtual bool OnConnectionRequest(WCHAR* IP, DWORD Port) = 0;
@@ -88,7 +89,7 @@ protected:
 
 	DWORD64 recvBytes = 0;
 	DWORD64 sendBytes = 0;
-	
+
 	//시간 기억
 	DWORD currentTime;
 
