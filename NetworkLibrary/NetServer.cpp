@@ -108,6 +108,24 @@ bool CNetServer::SendPacket(DWORD64 sessionID, CPacket* packet)
     return true;
 }
 
+bool CNetServer::SendAndDisconnect(DWORD64 sessionID, CPacket* packet)
+{
+    SESSION* session = AcquireSession(sessionID);
+
+    if (session == NULL) {
+        PacketFree(packet);
+        return false;
+    }
+
+    HeaderAlloc(packet);
+    Encode(packet);
+    session->sendQ.Enqueue(packet);
+    session->isDisconnectReserved = true;
+    SendPost(session);
+    
+    return true;
+}
+
 bool CNetServer::SendAndDisconnect(DWORD64 sessionID, CPacket* packet, DWORD timeOutVal)
 {
     SESSION* session = AcquireSession(sessionID);
@@ -395,6 +413,7 @@ bool CNetServer::MakeSession(WCHAR* IP, SOCKET sock, DWORD64* ID)
     ZeroMemory(&session->sendOver, sizeof(session->sendOver));
     session->sendOver.type = 1;
 
+    session->isDisconnectReserved = false;
     session->isTimeOutReserved = false;
     session->lastTime = currentTime;
 
@@ -511,7 +530,10 @@ unsigned int __stdcall CNetServer::WorkProc(void* arg)
                 server->PacketFree(session->sendBuf[session->sendCnt]);
             }
             InterlockedExchange8((char*)&session->isSending, 0);
-            if (ret != false) {
+            if (session->isDisconnectReserved) {
+                server->Disconnect(sessionID);
+            }
+            else if (ret != false) {
                 //추가로 send에 맞춘 acquire
                 server->AcquireSession(sessionID);
                 server->SendPost(session);
