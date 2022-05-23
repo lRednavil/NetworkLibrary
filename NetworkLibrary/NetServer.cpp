@@ -633,7 +633,7 @@ void CNetServer::RecvProc(SESSION* session)
         if (netHeader.len > packet->GetBufferSize()) {
             Disconnect(session->sessionID);
             PacketFree(packet);
-            _FILE_LOG(LOG_LEVEL_ERROR, L"LibraryLog", L"Unacceptable Length from %S", session->IP);
+            _FILE_LOG(LOG_LEVEL_ERROR, L"LibraryLog", L"Unacceptable Length from %s", session->IP);
             OnError(-1, L"Unacceptable Length");
             LoseSession(session);
             return;
@@ -655,7 +655,7 @@ void CNetServer::RecvProc(SESSION* session)
         if (netHeader.staticCode != STATIC_CODE) {
             PacketFree(packet);
             swprintf_s(errText, L"%s %s", L"Packet Code Error", session->IP);
-            _FILE_LOG(LOG_LEVEL_ERROR, L"LibraryLog", L"Packet Code Error from %S", session->IP);
+            _FILE_LOG(LOG_LEVEL_ERROR, L"LibraryLog", L"Packet Code Error from %s", session->IP);
             OnError(-1, errText);
             //헤드코드 변조시 접속 제거
             Disconnect(session->sessionID);
@@ -669,7 +669,7 @@ void CNetServer::RecvProc(SESSION* session)
         if (header->checkSum != MakeCheckSum(packet)) {
             PacketFree(packet);
             swprintf_s(errText, L"%s %s", L"Packet Code Error", session->IP);
-            _FILE_LOG(LOG_LEVEL_ERROR, L"LibraryLog", L"Packet Checksum Error from %S", session->IP);
+            _FILE_LOG(LOG_LEVEL_ERROR, L"LibraryLog", L"Packet Checksum Error from %s", session->IP);
             OnError(-1, errText);
             //체크섬 변조시 접속 제거
             Disconnect(session->sessionID);
