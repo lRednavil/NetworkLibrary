@@ -530,14 +530,14 @@ unsigned int __stdcall CNetServer::WorkProc(void* arg)
                 server->PacketFree(session->sendBuf[session->sendCnt]);
             }
             InterlockedExchange8((char*)&session->isSending, 0);
-            if (session->isDisconnectReserved) {
-                server->Disconnect(sessionID);
-            }
-            else if (ret != false) {
-                //추가로 send에 맞춘 acquire
-                server->AcquireSession(sessionID);
-                server->SendPost(session);
-            }
+			if (session->isDisconnectReserved) {
+				server->Disconnect(sessionID);
+			}
+			else if (ret != false) {
+				//추가로 send에 맞춘 acquire
+				server->AcquireSession(sessionID);
+				server->SendPost(session);
+			}
         }
         //작업 완료에 대한 lose
         server->LoseSession(session);
