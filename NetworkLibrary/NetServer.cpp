@@ -402,8 +402,8 @@ bool CNetServer::MakeSession(WCHAR* IP, SOCKET sock, DWORD64* ID)
 
     session = &sessionArr[sessionID_high];
 
-    //session->sock = sock;
-    InterlockedExchange64((__int64*)&session->sock, sock);
+    session->sock = sock;
+    //InterlockedExchange64((__int64*)&session->sock, sock);
 
     wmemmove_s(session->IP, 16, IP, 16);
     session->sessionID = *ID = sessionID;
