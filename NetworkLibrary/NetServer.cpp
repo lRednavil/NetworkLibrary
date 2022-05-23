@@ -61,7 +61,7 @@ void CNetServer::Monitor()
 
     myMonitor->UpdateProcessTime();
     totalMonitor->UpdateHardwareTime();
-    
+
     wprintf_s(L"======== Process Information ========\n");
     wprintf_s(L"CPU Total : %f%% || User Total : %f%% || Kernel Total : %f%% \nPrivate Bytes : %lld Mb \n", myMonitor->ProcessTotal(), myMonitor->ProcessUser(), myMonitor->ProcessKernel(), myMonitor->ProcessPrivateBytes() / 1024 / 1024);
 
@@ -108,6 +108,24 @@ bool CNetServer::SendPacket(DWORD64 sessionID, CPacket* packet)
     return true;
 }
 
+bool CNetServer::SendAndDisconnect(DWORD64 sessionID, CPacket* packet)
+{
+    SESSION* session = AcquireSession(sessionID);
+
+    if (session == NULL) {
+        PacketFree(packet);
+        return false;
+    }
+
+    HeaderAlloc(packet);
+    Encode(packet);
+    session->sendQ.Enqueue(packet);
+    session->isDisconnectReserved = true;
+    SendPost(session);
+    
+    return true;
+}
+
 bool CNetServer::SendAndDisconnect(DWORD64 sessionID, CPacket* packet, DWORD timeOutVal)
 {
     SESSION* session = AcquireSession(sessionID);
@@ -121,12 +139,8 @@ bool CNetServer::SendAndDisconnect(DWORD64 sessionID, CPacket* packet, DWORD tim
     Encode(packet);
     session->sendQ.Enqueue(packet);
     SendPost(session);
-
-    SetTimeOut(sessionID, 1000);
-
     session->isTimeOutReserved = true;
     SetTimeOut(sessionID, timeOutVal, true);
-
     return true;
 }
 
@@ -137,7 +151,6 @@ CPacket* CNetServer::PacketAlloc()
     packet->Clear();
     packet->MoveWritePos(sizeof(NET_HEADER));
     packet->isEncoded = false;
-
     return packet;
 }
 
@@ -169,7 +182,7 @@ BYTE CNetServer::MakeCheckSum(CPacket* packet)
 void CNetServer::Encode(CPacket* packet)
 {
     if (packet->isEncoded) return;
-    
+
     packet->isEncoded = true;
 
     NET_HEADER* header = (NET_HEADER*)packet->GetBufferPtr();
@@ -177,7 +190,7 @@ void CNetServer::Encode(CPacket* packet)
     BYTE key = STATIC_KEY;
     WORD len = header->len;
     BYTE randKey = header->randomKey;
-    
+
     WORD cnt;
 
     ptr[0] ^= randKey + 1;
@@ -400,6 +413,7 @@ bool CNetServer::MakeSession(WCHAR* IP, SOCKET sock, DWORD64* ID)
     ZeroMemory(&session->sendOver, sizeof(session->sendOver));
     session->sendOver.type = 1;
 
+    session->isDisconnectReserved = false;
     session->isTimeOutReserved = false;
     session->lastTime = currentTime;
 
@@ -418,7 +432,7 @@ bool CNetServer::MakeSession(WCHAR* IP, SOCKET sock, DWORD64* ID)
         return false;
     }
 
-    
+
     return true;
 }
 
@@ -496,36 +510,41 @@ unsigned int __stdcall CNetServer::WorkProc(void* arg)
             continue;
         }
 
-		//recvd
-		if (overlap->type == 0) {
-			if (ret == false || bytes == 0) {
-				//server->Disconnect(sessionID);
-			}
-			else
-			{
-				session->recvQ.MoveRear(bytes);
-				//추가 recv에 맞춘 acquire
-				server->AcquireSession(sessionID);
-				server->RecvProc(session);
-			}
-		}
-		//sent
-		if (overlap->type == 1) {
-			while (session->sendCnt) {
-				--session->sendCnt;
-				server->PacketFree(session->sendBuf[session->sendCnt]);
-			}
-			InterlockedExchange8((char*)&session->isSending, 0);
-			if (ret != false) {
-				//추가로 send에 맞춘 acquire
-				server->AcquireSession(sessionID);
-				server->SendPost(session);
-			}
-		}
-		//작업 완료에 대한 lose
+        //recvd
+        if (overlap->type == 0) {
+            if (ret == false || bytes == 0) {
+                //server->Disconnect(sessionID);
+            }
+            else
+            {
+                session->recvQ.MoveRear(bytes);
+                //추가 recv에 맞춘 acquire
+                server->AcquireSession(sessionID);
+                server->RecvProc(session);
+            }
+        }
+        //sent
+        if (overlap->type == 1) {
+            while (session->sendCnt) {
+                --session->sendCnt;
+                server->PacketFree(session->sendBuf[session->sendCnt]);
+            }
+            InterlockedExchange8((char*)&session->isSending, 0);
+            if (session->isDisconnectReserved) {
+                server->Disconnect(sessionID);
+            }
+            else if (ret != false) {
+                //추가로 send에 맞춘 acquire
+                server->AcquireSession(sessionID);
+                server->SendPost(session);
+            }
+        }
+        //작업 완료에 대한 lose
         server->LoseSession(session);
 
-	}
+    }
+
+
 
 
     return 0;
@@ -560,14 +579,14 @@ unsigned int __stdcall CNetServer::AcceptProc(void* arg)
             closesocket(sock);
             continue;
         }
-        
+
         session = server->FindSession(sessionID);
 
         if (server->OnClientJoin(sessionID) == false) {
             server->LoseSession(session);
             continue;
         }
-        
+
         InterlockedIncrement(&server->sessionCnt);
 
         server->RecvPost(session);
@@ -580,7 +599,6 @@ unsigned int __stdcall CNetServer::TimerProc(void* arg)
 {
     CNetServer* server = (CNetServer*)arg;
     SESSION* session;
-    char fence;
     int cnt;
     //초기오류 방지구간
     server->currentTime = timeGetTime();
@@ -702,7 +720,7 @@ bool CNetServer::RecvPost(SESSION* session)
     pBuf[0] = { len, recvQ->GetRearBufferPtr() };
     pBuf[1] = { recvQ->GetFreeSize() - len, recvQ->GetBufferPtr() };
 
-    ret = WSARecv(session->sock, pBuf, 2, NULL, &flag, (LPWSAOVERLAPPED)&session->recvOver, NULL);
+    ret = WSARecv(InterlockedOr64((__int64*)&session->sock, 0), pBuf, 2, NULL, &flag, (LPWSAOVERLAPPED)&session->recvOver, NULL);
 
     if (ret == SOCKET_ERROR) {
         err = WSAGetLastError();
@@ -776,7 +794,7 @@ bool CNetServer::SendPost(SESSION* session)
         pBuf[cnt].len = packet->GetDataSize();
     }
 
-    ret = WSASend(session->sock, pBuf, session->sendCnt, NULL, 0, (LPWSAOVERLAPPED)&session->sendOver, NULL);
+    ret = WSASend(InterlockedOr64((__int64*)&session->sock, 0), pBuf, session->sendCnt, NULL, 0, (LPWSAOVERLAPPED)&session->sendOver, NULL);
 
     if (ret == SOCKET_ERROR) {
         err = WSAGetLastError();
