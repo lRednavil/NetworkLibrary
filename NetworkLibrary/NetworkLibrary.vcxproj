@@ -154,6 +154,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="framework.h" />
+    <ClInclude Include="GameServer.h" />
     <ClInclude Include="LanClient.h" />
     <ClInclude Include="LanCommon.h" />
     <ClInclude Include="LanServer.h" />
@@ -174,6 +175,7 @@
     <ClInclude Include="TLSMemoryPool.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="GameServer.cpp" />
     <ClCompile Include="LanClient.cpp" />
     <ClCompile Include="LanCommon.cpp" />
     <ClCompile Include="LanServer.cpp" />
