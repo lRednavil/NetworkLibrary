@@ -153,6 +153,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="ErrorReason.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="GameServer.h" />
     <ClInclude Include="LanClient.h" />
