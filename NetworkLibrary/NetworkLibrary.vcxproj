@@ -143,6 +143,7 @@
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <Optimization>Disabled</Optimization>
+      <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
     </ClCompile>
     <Link>
       <SubSystem>
@@ -155,6 +156,7 @@
   <ItemGroup>
     <ClInclude Include="ErrorReason.h" />
     <ClInclude Include="framework.h" />
+    <ClInclude Include="GameCommon.h" />
     <ClInclude Include="GameServer.h" />
     <ClInclude Include="LanClient.h" />
     <ClInclude Include="LanCommon.h" />

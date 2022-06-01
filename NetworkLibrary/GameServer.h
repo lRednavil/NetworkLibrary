@@ -1,55 +1,24 @@
 #pragma once
-#pragma once
-//struct SESSION;
-struct OVERLAPPEDEX {
-	OVERLAPPED overlap;
-	WORD type;
-};
 
+struct SESSION;
+class CPacket;
 
-struct SESSION {
-	OVERLAPPEDEX recvOver;
-	OVERLAPPEDEX sendOver;
-	//session refCnt의 역할
-	DWORD64 ioCnt;
-	bool isSending;
+class CProcessMontior;
+class CProcessorMontior;
 
-	//네트워크 메세지용 버퍼들
-	CRingBuffer recvQ;
-	CLockFreeQueue<CPacket*> sendQ;
-	DWORD64 sessionID;
-
-	//timeOut용 변수들
-	DWORD lastTime;
-	DWORD timeOutVal;
-
-	//send 후 해제용
-	//CPacket* sendBuf[SEND_PACKET_MAX];
-	//monitor
-	DWORD sendCnt; // << 보낸 메세지수 확보
-
-	//readonly
-	SOCKET sock;
-	WCHAR IP[16];
-	
-	//gameServer용
-	CUnitClass* belongClass;
-
-	SESSION() {
-		//ioCnt = RELEASE_FLAG;
-	}
-};
-
-class CUnitClass {
+//상속받아서
+class CUnitClass{
+public:
 	bool Disconnect(DWORD64 sessionID);
-	bool SendPacket(DWORD64 sessionID, CPacket* packet);
+	inline bool SendPacket(DWORD64 sessionID, CPacket* packet);
 
 	//기본 참조카운트 1부여 및 초기화 실행
-	CPacket* PacketAlloc();
+	inline CPacket* PacketAlloc();
 	void	PacketFree(CPacket* packet);
 
 	void SetTimeOut(DWORD64 sessionID, DWORD timeVal);
 
+	//virtual함수 영역
 	//accept 직후, IP filterinig 등의 목적
 	virtual bool OnConnectionRequest(WCHAR* IP, DWORD Port) = 0;
 	//return false; 시 클라이언트 거부.
@@ -69,46 +38,42 @@ class CUnitClass {
 	virtual void Update() = 0;
 
 	//classInfos
-	//bool isAwake
-	//WORD targetFrame
-	//DWORD lastTime
+	bool isAwake;
+	WORD targetFrame;
+	DWORD lastTime;
 	//SESSION_LIST
+	BYTE endOption;
 
+	CGameServer* server;
 
 };
 
 struct CUSTOM_TCB {
 	//thread를 tagName에 따라서 생성
 	WCHAR tagName[64];
-	WORD MAX_CLASS_UNIT;
+	WORD max_class_unit;
 	WORD currentUnits;
-	CUnitClass* classList;
+	CUnitClass** classList;
 };
 
-//_beginthreadex를 할거면 부를 함수 정하기 -> Attatch
-//
+struct TCB_TO_THREAD {
+	CGameServer* thisPtr;
+	CUSTOM_TCB* tcb;
+};
 
-///
-/// Attatch(const WCHAR* tagName){
-///		if(tagName.Exists == false) goto begin;
-///		
-///		if(TCB.currentUnits < MAX_CLASS_UNIT){
-///			classList[++currentUnits] = this;
-///			
-///			return;
-///		}
-/// }
-///
-
-
-class CPacket;
 
 class CGameServer
 {
+private:
+	enum {
+		TAG_NAME_MAX = 128
+	};
+
 public:
 	//오픈 IP / 포트 / 워커스레드 수(생성수, 러닝수) / 나글옵션 / 최대접속자 수
 	bool Start(WCHAR* IP, DWORD port, DWORD createThreads, DWORD runningThreads, bool isNagle, DWORD maxConnect);
 	void Stop();
+
 	int GetSessionCount();
 	//모니터링용 함수
 	void Monitor();
@@ -121,6 +86,11 @@ public:
 	void	PacketFree(CPacket* packet);
 
 	void SetTimeOut(DWORD64 sessionID, DWORD timeVal);
+
+	//gameServer용 함수
+
+	//같은 tagName의 tcb존재시 유효여부 판단 후 부착 or 새로운 tcb 생성
+	void Attatch(const WCHAR* tagName, CUnitClass* const classPtr, const WORD maxUnitCnt = 1);
 
 private:
 	bool NetInit(WCHAR* IP, DWORD port, bool isNagle);
@@ -153,6 +123,7 @@ private:
 	static unsigned int __stdcall WorkProc(void* arg);
 	static unsigned int __stdcall AcceptProc(void* arg);
 	static unsigned int __stdcall TimerProc(void* arg);
+	static unsigned int __stdcall UnitProc(void* arg);
 	void RecvProc(SESSION* session);
 	bool RecvPost(SESSION* session);
 	bool SendPost(SESSION* session);
@@ -162,18 +133,20 @@ protected:
 	DWORD64 totalAccept = 0;
 	DWORD64 totalSend = 0;
 	DWORD64 totalRecv = 0;
-	DWORD64 totalRelease = 0;
 	//tps측정용 기억
 	DWORD64 lastAccept = 0;
 	DWORD64 lastSend = 0;
 	DWORD64 lastRecv = 0;
-	DWORD64 lastRelease = 0;
 
 	DWORD64 recvBytes = 0;
 	DWORD64 sendBytes = 0;
 
 	//시간 기억
 	DWORD currentTime;
+	
+	//gameserver전용 컨테이너
+	CUSTOM_TCB* tcbArray;
+	DWORD tcbCnt = 0;
 
 private:
 	//array for session

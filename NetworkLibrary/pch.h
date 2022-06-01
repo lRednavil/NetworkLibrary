@@ -36,4 +36,9 @@
 
 extern CTLSMemoryPool<CPacket> g_PacketPool;
 
+#define CRASH() do{ \
+int *p = 0; \
+*p = 0;	\
+}while(0) \
+
 #endif //PCH_H
