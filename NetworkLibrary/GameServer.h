@@ -6,7 +6,7 @@ class CPacket;
 class CProcessMontior;
 class CProcessorMontior;
 
-//상속받아서
+//상속받아서 구현 및 사용
 class CUnitClass{
 public:
 	bool Disconnect(DWORD64 sessionID);
@@ -37,9 +37,11 @@ public:
 	//gameserver용
 	virtual void Update() = 0;
 
+private:
 	//classInfos
 	bool isAwake;
-	WORD targetFrame;
+	//WORD targetFrame;
+	WORD frameDelay; //1초 / targetFrame
 	DWORD lastTime;
 	//SESSION_LIST
 	BYTE endOption;
@@ -89,7 +91,7 @@ public:
 
 	//gameServer용 함수
 
-	//같은 tagName의 tcb존재시 유효여부 판단 후 부착 or 새로운 tcb 생성
+	//같은 tagName의 tcb존재시 유효여부 판단 후 부착 or 새로운 tcb 생성 및 스레드 생성
 	void Attatch(const WCHAR* tagName, CUnitClass* const classPtr, const WORD maxUnitCnt = 1);
 
 private:
@@ -123,6 +125,7 @@ private:
 	static unsigned int __stdcall WorkProc(void* arg);
 	static unsigned int __stdcall AcceptProc(void* arg);
 	static unsigned int __stdcall TimerProc(void* arg);
+	//업데이트 스레드에 해당하는 함수
 	static unsigned int __stdcall UnitProc(void* arg);
 	void RecvProc(SESSION* session);
 	bool RecvPost(SESSION* session);

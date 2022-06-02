@@ -132,18 +132,23 @@ unsigned int __stdcall CGameServer::UnitProc(void* arg)
     TCB_TO_THREAD* info = (TCB_TO_THREAD*)arg;
     CGameServer* server = info->thisPtr;
     CUSTOM_TCB* tcb = info->tcb;
+    CUnitClass* unit;
 
-    DWORD currentTime;
     int cnt;
     int lim;
 
     while (server->isServerOn) {
-        currentTime = server->currentTime;
-
         lim = min(tcb->currentUnits, tcb->max_class_unit);
 
         for (cnt = 0; cnt < lim; cnt++) {
+            unit = tcb->classList[cnt];
+
+            //jobQ에 들어온 메세지 처리함수
+            //unit->MessageProc();
             
+            //frameDelay 이상의 시간이 지난 경우 작동
+            //frameDelay 미만의 시간이 지난 경우 바로 return
+            unit->Update();
         }
     }
 
