@@ -2,9 +2,31 @@
 #include "GameServer.h"
 #include "GameCommon.h"
 
-class CTest : public CUnitClass {
+#include <timeapi.h>
 
-};
+#pragma comment(lib, "Winmm")
+
+#pragma region UnitClass
+void CUnitClass::InitClass(WORD targetFrame, BYTE endOpt)
+{
+    frameDelay = 1000 / targetFrame;
+    endOption = endOpt;
+}
+
+inline bool CUnitClass::MoveClass(const WCHAR* className, DWORD64 sessionID)
+{
+    return server->MoveClass(className, sessionID);
+}
+
+inline bool CUnitClass::FollowClass(DWORD64 targetID, DWORD64 followID)
+{
+    return server->FollowClass(targetID, followID);
+}
+
+inline bool CUnitClass::Disconnect(DWORD64 sessionID)
+{
+    return server->Disconnect(sessionID);
+}
 
 inline bool CUnitClass::SendPacket(DWORD64 sessionID, CPacket* packet)
 {
@@ -16,12 +38,97 @@ inline CPacket* CUnitClass::PacketAlloc()
     return g_PacketPool.Alloc();
 }
 
-void CGameServer::Attatch(const WCHAR* tagName, CUnitClass* const classPtr, const WORD maxUnitCnt)
+inline void CUnitClass::PacketFree(CPacket* packet)
+{
+    g_PacketPool.Free(packet);
+}
+
+inline void CUnitClass::SetTimeOut(DWORD64 sessionID, DWORD timeVal)
+{
+    server->SetTimeOut(sessionID, timeVal);
+}
+
+#pragma endregion
+
+bool CGameServer::MoveClass(const WCHAR* tagName, DWORD64 sessionID)
+{
+    return true;
+}
+
+bool CGameServer::FollowClass(DWORD64 targetID, DWORD64 followID)
+{
+    SESSION* target = AcquireSession(targetID);
+    SESSION* follower = AcquireSession(followID);
+    bool res;
+
+    do {
+        if (target == NULL || follower == NULL) {
+            res = false;
+            break;
+        }
+
+        if (target->belongClass->currentUser >= target->belongClass->maxUser) {
+            res = false;
+            break;
+        }
+
+        
+
+        res = true;
+    } while (0);
+
+    LoseSession(target);
+    LoseSession(follower);
+    
+    return res;
+}
+
+bool CGameServer::JoinThread(const WCHAR* tagName)
 {
     int cnt;
     WORD tcbIdx;
     WORD unitIdx;
 
+    for (cnt = 0; cnt < tcbCnt; ++cnt) {
+        if (wcscmp(tagName, tcbArray[cnt].tagName) != 0)
+            continue;
+
+        if (tcbArray[cnt].currentUnits == tcbArray[cnt].max_class_unit)
+            continue;
+
+        return JoinClass(&tcbArray[cnt]);
+    }
+
+    return false;
+}
+
+bool CGameServer::JoinClass(CUSTOM_TCB* tcb)
+{
+    int cnt;
+    CUnitClass* unit;
+
+    for (cnt = 0; cnt < tcb->max_class_unit; cnt++) {
+        unit = tcb->classList[cnt];
+
+        if (unit->isAwake == true) continue;
+
+        
+    }
+    return false;
+}
+
+void CGameServer::AttatchClass(const WCHAR* tagName, CUnitClass* const classPtr, const WORD maxUnitCnt)
+{
+    int cnt;
+    WORD tcbIdx;
+    WORD unitIdx;
+
+    if (classPtr->server != nullptr) {
+        _FILE_LOG(LOG_LEVEL_ERROR, L"User_Error", L"UnitClass Already Have Another Game Server");
+        CRASH();
+    }
+
+    classPtr->server = this;
     for (cnt = 0; cnt < tcbCnt; ++cnt) {
         if (wcscmp(tagName, tcbArray[cnt].tagName) != 0) 
             continue;
@@ -82,7 +189,7 @@ unsigned int __stdcall CGameServer::WorkProc(void* arg)
         }
         //disconnect의 경우
         if ((__int64)overlap == OV_DISCONNECT) {
-            session->belongClass->OnClientLeave(sessionID);
+            //session->belongClass->OnClientLeave(sessionID);
             server->sessionStack.Push(session->sessionID >> MASK_SHIFT);
             continue;
         }
@@ -127,6 +234,35 @@ unsigned int __stdcall CGameServer::WorkProc(void* arg)
     return 0;
 }
 
+unsigned int __stdcall CGameServer::TimerProc(void* arg)
+{
+    CGameServer* server = (CGameServer*)arg;
+    SESSION* session;
+    int cnt;
+    //초기오류 방지구간
+    server->currentTime = timeGetTime();
+    Sleep(250);
+
+    while (server->isServerOn) {
+        server->currentTime = timeGetTime();
+
+        for (cnt = 0; cnt < server->maxConnection; ++cnt) {
+            session = &server->sessionArr[cnt];
+
+            if (session->ioCnt & RELEASE_FLAG) continue;
+
+            if (server->currentTime - session->lastTime >= session->timeOutVal) {
+                server->Disconnect(session->sessionID);
+                session->belongClass->OnTimeOut(session->sessionID);
+            }
+        }
+
+        Sleep(5);
+    }
+
+    return 0;
+}
+
 unsigned int __stdcall CGameServer::UnitProc(void* arg)
 {
     TCB_TO_THREAD* info = (TCB_TO_THREAD*)arg;
@@ -143,12 +279,17 @@ unsigned int __stdcall CGameServer::UnitProc(void* arg)
         for (cnt = 0; cnt < lim; cnt++) {
             unit = tcb->classList[cnt];
 
+            if (unit->isAwake == false) continue;
+
             //jobQ에 들어온 메세지 처리함수
-            //unit->MessageProc();
+            unit->MsgUpdate();
             
-            //frameDelay 이상의 시간이 지난 경우 작동
-            //frameDelay 미만의 시간이 지난 경우 바로 return
-            unit->Update();
+            if (server->currentTime - unit->lastTime >= unit->frameDelay) {
+                unit->lastTime = server->currentTime;
+                //frameDelay 이상의 시간이 지난 경우 작동
+                //frameDelay 미만의 시간이 지난 경우 바로 return
+                unit->FrameUpdate();
+            }
         }
     }
 
@@ -229,7 +370,30 @@ void CGameServer::RecvProc(SESSION* session)
 		packet->MoveReadPos(sizeof(netHeader));
 
         session->belongClass->OnRecv(session->sessionID, packet);
+        
 	}
 
 	RecvPost(session);
+}
+
+inline CPacket* CGameServer::PacketAlloc()
+{
+    return g_PacketPool.Alloc();
+}
+
+inline void CGameServer::PacketFree(CPacket* packet)
+{
+    g_PacketPool.Free(packet);
+}
+
+void CGameServer::SetTimeOut(DWORD64 sessionID, DWORD timeVal)
+{
+    SESSION* session = AcquireSession(sessionID);
+
+    if (session == NULL) {
+        return;
+    }
+
+    session->timeOutVal = timeVal;
+    LoseSession(session);
 }

@@ -435,7 +435,7 @@ void CLanServer::RecvProc(SESSION* session)
 
         //넷헤더 영역 지나가기
         recvQ->MoveFront(sizeof(lanHeader));
-        //나중에 메세지 헤더 따라 처리 or MsgProc(session, packet)
+        //나중에 메세지 헤더 따라 처리 or MsgUpdate(session, packet)
         recvQ->Dequeue((char*)packet->GetWritePtr(), lanHeader.len);
         packet->MoveWritePos(lanHeader.len);
 

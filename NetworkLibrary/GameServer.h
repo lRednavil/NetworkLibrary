@@ -6,28 +6,42 @@ class CPacket;
 class CProcessMontior;
 class CProcessorMontior;
 
+class CGameServer;
+
 //상속받아서 구현 및 사용
 class CUnitClass{
+	friend class CGameServer;
+
 public:
-	bool Disconnect(DWORD64 sessionID);
+	enum END_OPTION {
+		OPT_DESTROY,
+		OPT_STOP,
+		OPT_RESET
+	};
+
+public:
+	void InitClass(WORD targetFrame, BYTE endOpt);
+	
+	//server참조 함수들
+	inline bool MoveClass(const WCHAR* className, DWORD64 sessionID);
+	inline bool FollowClass(DWORD64 targetID, DWORD64 followID);
+
+	inline bool Disconnect(DWORD64 sessionID);
 	inline bool SendPacket(DWORD64 sessionID, CPacket* packet);
 
 	//기본 참조카운트 1부여 및 초기화 실행
 	inline CPacket* PacketAlloc();
-	void	PacketFree(CPacket* packet);
+	inline void	PacketFree(CPacket* packet);
 
-	void SetTimeOut(DWORD64 sessionID, DWORD timeVal);
+	inline void SetTimeOut(DWORD64 sessionID, DWORD timeVal);
 
 	//virtual함수 영역
-	//accept 직후, IP filterinig 등의 목적
-	virtual bool OnConnectionRequest(WCHAR* IP, DWORD Port) = 0;
-	//return false; 시 클라이언트 거부.
-	//return true; 시 접속 허용
-	virtual bool OnClientJoin(DWORD64 sessionID) = 0;
-	virtual bool OnClientLeave(DWORD64 sessionID) = 0;
+	virtual void OnClientJoin(DWORD64 sessionID) = 0;
+	virtual void OnClientLeave(DWORD64 sessionID) = 0;
 
 	//message 분석 역할
 	//메세지 헤더는 알아서 검증할 것
+	//업데이트 스레드 처리 필요시 jobQ에 enQ할것
 	virtual void OnRecv(DWORD64 sessionID, CPacket* packet) = 0;
 
 	virtual void OnTimeOut(DWORD64 sessionID) = 0;
@@ -35,24 +49,26 @@ public:
 	virtual void OnError(int error, const WCHAR* msg) = 0;
 
 	//gameserver용
-	virtual void Update() = 0;
+	//jobQ에 EnQ된 메세지들 처리
+	virtual void MsgUpdate() = 0;
+	//frame단위의 업데이트 처리
+	virtual void FrameUpdate() = 0;
 
 private:
 	//classInfos
 	bool isAwake;
-	//WORD targetFrame;
 	WORD frameDelay; //1초 / targetFrame
+	WORD currentUser;
+	WORD maxUser;
 	DWORD lastTime;
-	//SESSION_LIST
+
 	BYTE endOption;
-
-	CGameServer* server;
-
+	CGameServer* server = nullptr;
 };
 
 struct CUSTOM_TCB {
 	//thread를 tagName에 따라서 생성
-	WCHAR tagName[64];
+	WCHAR tagName[128];
 	WORD max_class_unit;
 	WORD currentUnits;
 	CUnitClass** classList;
@@ -84,15 +100,29 @@ public:
 	bool SendPacket(DWORD64 sessionID, CPacket* packet);
 
 	//기본 참조카운트 1부여 및 초기화 실행
-	CPacket* PacketAlloc();
-	void	PacketFree(CPacket* packet);
+	inline CPacket* PacketAlloc();
+	inline void	PacketFree(CPacket* packet);
 
 	void SetTimeOut(DWORD64 sessionID, DWORD timeVal);
 
-	//gameServer용 함수
+	//virtual함수 영역
+	//accept 직후, IP filterinig 등의 목적
+	virtual bool OnConnectionRequest(WCHAR* IP, DWORD Port) = 0;
+	//return false; 시 클라이언트 거부.
+	//return true; 시 접속 허용
+	virtual bool OnClientJoin(DWORD64 sessionID) = 0;
+	virtual bool OnClientLeave(DWORD64 sessionID) = 0;
 
+	
+	//gameServer용 함수
+	bool MoveClass(const WCHAR* tagName, DWORD64 sessionID);
+	bool FollowClass(DWORD64 targetID, DWORD64 followID);
+
+	bool JoinThread(const WCHAR* tagName);
+	bool JoinClass(CUSTOM_TCB* tcb);
+	
 	//같은 tagName의 tcb존재시 유효여부 판단 후 부착 or 새로운 tcb 생성 및 스레드 생성
-	void Attatch(const WCHAR* tagName, CUnitClass* const classPtr, const WORD maxUnitCnt = 1);
+	void AttatchClass(const WCHAR* tagName, CUnitClass* const classPtr, const WORD maxUnitCnt = 1);
 
 private:
 	bool NetInit(WCHAR* IP, DWORD port, bool isNagle);

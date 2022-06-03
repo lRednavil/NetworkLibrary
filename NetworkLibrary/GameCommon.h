@@ -53,6 +53,7 @@ struct SESSION {
 	WCHAR IP[16];
 
 	//gameServer¿ë
+	
 	CUnitClass* belongClass;
 
 	SESSION() {
