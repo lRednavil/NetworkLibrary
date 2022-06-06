@@ -226,6 +226,7 @@ private:
 	template <class DATA> friend struct CHUNKNODE;
 	template <class DATA> friend class CTLSMemoryPool;
 	friend class CNetServer;
+	friend class CGameServer;
 	//////////////////////////////////////////////////////////////////////////
 	// 생성자, 파괴자.
 	//
