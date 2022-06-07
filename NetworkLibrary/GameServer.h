@@ -23,7 +23,11 @@ public:
 	void InitClass(WORD targetFrame, BYTE endOpt);
 	
 	//server참조 함수들
-	inline bool MoveClass(const WCHAR* className, DWORD64 sessionID);
+	
+	//1인 이동용
+	inline bool MoveClass(const WCHAR* className, DWORD64 sessionID, WORD classIdx);
+	//다수 이동용
+	inline bool MoveClass(const WCHAR* className, DWORD64* sessionIDs, WORD sessionCnt, WORD classIdx);
 	inline bool FollowClass(DWORD64 targetID, DWORD64 followID);
 
 	inline bool Disconnect(DWORD64 sessionID);
@@ -72,6 +76,8 @@ struct CUSTOM_TCB {
 	WORD max_class_unit;
 	WORD currentUnits;
 	CUnitClass** classList;
+	//스레드 깨우기용
+	HANDLE hEvent;
 };
 
 struct TCB_TO_THREAD {
@@ -115,12 +121,10 @@ public:
 
 	
 	//gameServer용 함수
-	bool MoveClass(const WCHAR* tagName, DWORD64 sessionID);
+	bool MoveClass(const WCHAR* tagName, DWORD64 sessionID, WORD classIdx);
+	bool MoveClass(const WCHAR* tagName, DWORD64* sessionIDs, WORD sessionCnt, WORD classIdx);
 	bool FollowClass(DWORD64 targetID, DWORD64 followID);
 
-	bool JoinThread(const WCHAR* tagName);
-	bool JoinClass(CUSTOM_TCB* tcb);
-	
 	//같은 tagName의 tcb존재시 유효여부 판단 후 부착 or 새로운 tcb 생성 및 스레드 생성
 	void AttatchClass(const WCHAR* tagName, CUnitClass* const classPtr, const WORD maxUnitCnt = 1);
 

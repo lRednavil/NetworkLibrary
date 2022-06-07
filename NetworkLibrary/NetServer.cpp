@@ -427,8 +427,7 @@ bool CNetServer::MakeSession(WCHAR* IP, SOCKET sock, DWORD64* ID)
         _FILE_LOG(LOG_LEVEL_ERROR, L"LibraryLog", L"IOCP to SOCKET Failed");
         OnError(-1, L"IOCP to SOCKET Failed");
         //crash ¿ëµµ
-        ID = 0;
-        *ID = 0;
+        CRASH();
         return false;
     }
 

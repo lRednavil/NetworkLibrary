@@ -10,6 +10,9 @@
 #define STATIC_CODE 0x77
 #define STATIC_KEY 0x32
 
+#define SEND_PACKET_MAX 200
+#define TIMER_PRECISION 5
+
 enum OVERLAP_ENUM {
 	OV_RECV = 0,
 	OV_SEND = 1,
@@ -22,16 +25,12 @@ struct OVERLAPPEDEX {
 };
 
 struct SESSION {
-	enum {
-		SEND_PACKET_MAX = 200
-	};
-
 	OVERLAPPEDEX recvOver;
 	OVERLAPPEDEX sendOver;
 	//session refCnt의 역할
 	DWORD64 ioCnt;
 	bool isSending;
-	bool isDisconnectReserved;
+	volatile bool isMoving;
 
 	//네트워크 메세지용 버퍼들
 	CRingBuffer recvQ;
@@ -53,7 +52,7 @@ struct SESSION {
 	WCHAR IP[16];
 
 	//gameServer용
-	
+	CUSTOM_TCB* belongThread;
 	CUnitClass* belongClass;
 
 	SESSION() {
