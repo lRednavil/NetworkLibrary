@@ -612,8 +612,10 @@ unsigned int __stdcall CGameServer::WorkProc(void* arg)
         }
         //disconnectÀÇ °æ¿ì
         if ((__int64)overlap == OV_DISCONNECT) {
-            session->belongClass->OnClientLeave(sessionID);
-            InterlockedDecrement16((short*)&session->belongClass->currentUser);
+            if (session->belongClass != NULL) {
+                session->belongClass->OnClientLeave(sessionID);
+                InterlockedDecrement16((short*)&session->belongClass->currentUser);
+            }
             server->sessionStack.Push(session->sessionID >> MASK_SHIFT);
             continue;
         }
