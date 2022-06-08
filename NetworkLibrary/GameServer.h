@@ -3,8 +3,8 @@
 struct SESSION;
 class CPacket;
 
-class CProcessMontior;
-class CProcessorMontior;
+class CProcessMonitor;
+class CProcessorMonitor;
 
 class CGameServer;
 
