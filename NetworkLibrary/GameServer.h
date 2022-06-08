@@ -28,9 +28,9 @@ public:
 	//server참조 함수들
 	
 	//1인 이동용
-	bool MoveClass(const WCHAR* className, DWORD64 sessionID, WORD classIdx);
+	bool MoveClass(const WCHAR* className, DWORD64 sessionID, WORD classIdx = -1);
 	//다수 이동용
-	bool MoveClass(const WCHAR* className, DWORD64* sessionIDs, WORD sessionCnt, WORD classIdx);
+	bool MoveClass(const WCHAR* className, DWORD64* sessionIDs, WORD sessionCnt, WORD classIdx = -1);
 	bool FollowClass(DWORD64 targetID, DWORD64 followID);
 
 	bool Disconnect(DWORD64 sessionID);
@@ -71,6 +71,7 @@ private:
 	//readonly
 	alignas(64)
 	CLockFreeQueue<DWORD64>* joinQ;
+	CLockFreeQueue<DWORD64>* leaveQ;
 	WORD frameDelay; //1초 / targetFrame
 	BYTE endOption;
 	CGameServer* server = nullptr;
@@ -127,8 +128,8 @@ public:
 
 	
 	//gameServer용 함수
-	bool MoveClass(const WCHAR* tagName, DWORD64 sessionID, WORD classIdx);
-	bool MoveClass(const WCHAR* tagName, DWORD64* sessionIDs, WORD sessionCnt, WORD classIdx);
+	bool MoveClass(const WCHAR* tagName, DWORD64 sessionID, WORD classIdx = -1);
+	bool MoveClass(const WCHAR* tagName, DWORD64* sessionIDs, WORD sessionCnt, WORD classIdx = -1);
 	bool FollowClass(DWORD64 targetID, DWORD64 followID);
 
 	//같은 tagName의 tcb존재시 유효여부 판단 후 부착 or 새로운 tcb 생성 및 스레드 생성
@@ -172,7 +173,7 @@ private:
 	bool SendPost(SESSION* session);
 
 	//Class이동 보충용 함수
-	void UnitJoinProc(CUnitClass* unit);
+	void UnitJoinLeaveProc(CUnitClass* unit);
 
 protected:
 	//sessionID 겸용

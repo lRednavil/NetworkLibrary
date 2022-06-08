@@ -21,44 +21,44 @@ void CUnitClass::InitClass(WORD targetFrame, BYTE endOpt)
     endOption = endOpt;
 }
 
-inline bool CUnitClass::MoveClass(const WCHAR* className, DWORD64 sessionID, WORD classIdx = -1)
+bool CUnitClass::MoveClass(const WCHAR* className, DWORD64 sessionID, WORD classIdx)
 {
     return server->MoveClass(className, sessionID, classIdx);
 }
 
-inline bool CUnitClass::MoveClass(const WCHAR* className, DWORD64* sessionIDs, WORD sessionCnt, WORD classIdx = -1)
+bool CUnitClass::MoveClass(const WCHAR* className, DWORD64* sessionIDs, WORD sessionCnt, WORD classIdx)
 {
     if (sessionCnt == 0) return false;
 
     return server->MoveClass(className, sessionIDs, sessionCnt, classIdx);
 }
 
-inline bool CUnitClass::FollowClass(DWORD64 targetID, DWORD64 followID)
+bool CUnitClass::FollowClass(DWORD64 targetID, DWORD64 followID)
 {
     return server->FollowClass(targetID, followID);
 }
 
-inline bool CUnitClass::Disconnect(DWORD64 sessionID)
+bool CUnitClass::Disconnect(DWORD64 sessionID)
 {
     return server->Disconnect(sessionID);
 }
 
-inline bool CUnitClass::SendPacket(DWORD64 sessionID, CPacket* packet)
+bool CUnitClass::SendPacket(DWORD64 sessionID, CPacket* packet)
 {
     return server->SendPacket(sessionID, packet);
 }
 
-inline CPacket* CUnitClass::PacketAlloc()
+CPacket* CUnitClass::PacketAlloc()
 {
     return g_PacketPool.Alloc();
 }
 
-inline void CUnitClass::PacketFree(CPacket* packet)
+void CUnitClass::PacketFree(CPacket* packet)
 {
     g_PacketPool.Free(packet);
 }
 
-inline void CUnitClass::SetTimeOut(DWORD64 sessionID, DWORD timeVal)
+void CUnitClass::SetTimeOut(DWORD64 sessionID, DWORD timeVal)
 {
     server->SetTimeOut(sessionID, timeVal);
 }
@@ -118,7 +118,7 @@ END:
     if (destUnit != NULL) {
         //기존 클래스에 퇴장 신호
         session->isMoving = true;
-        session->belongClass->OnClientLeave(sessionID);
+        session->belongClass->leaveQ->Enqueue(sessionID);
         InterlockedDecrement16((short*)&session->belongClass->currentUser);
 
         session->belongThread = tcb;
@@ -195,7 +195,7 @@ END:
 		for (sessionIdx = 0; sessionIdx < sessionCnt; sessionIdx++) {
             sessionArr[sessionIdx]->isMoving = true;
             //기존 클래스에 퇴장 신호
-			sessionArr[sessionIdx]->belongClass->OnClientLeave(sessionIDs[sessionIdx]);
+			sessionArr[sessionIdx]->belongClass->leaveQ->Enqueue(sessionIDs[sessionIdx]);
 			InterlockedDecrement16((short*)&sessionArr[sessionIdx]->belongClass->currentUser);
 
 			sessionArr[sessionIdx]->belongThread = tcb;
@@ -776,7 +776,7 @@ unsigned int __stdcall CGameServer::UnitProc(void* arg)
                 unit->FrameUpdate();
             }
 
-            server->UnitJoinProc(unit);
+            server->UnitJoinLeaveProc(unit);
         }
 
     }
@@ -991,14 +991,20 @@ bool CGameServer::SendPost(SESSION* session)
     return true;
 }
 
-void CGameServer::UnitJoinProc(CUnitClass* unit)
+void CGameServer::UnitJoinLeaveProc(CUnitClass* unit)
 {
     DWORD64 sessionID;
     SESSION* session;
     while (unit->joinQ->Dequeue(&sessionID)) {
         unit->OnClientJoin(sessionID);
+        session = FindSession(sessionID);
         session->isMoving = false;
-        RecvPost(FindSession(sessionID));
+        RecvPost(session);
+    }
+
+    while (unit->leaveQ->Dequeue(&sessionID)) {
+        unit->OnClientLeave(sessionID);
+        session = FindSession(sessionID);
     }
 }
 
@@ -1102,12 +1108,12 @@ bool CGameServer::SendPacket(DWORD64 sessionID, CPacket* packet)
     return true;
 }
 
-inline CPacket* CGameServer::PacketAlloc()
+CPacket* CGameServer::PacketAlloc()
 {
     return g_PacketPool.Alloc();
 }
 
-inline void CGameServer::PacketFree(CPacket* packet)
+void CGameServer::PacketFree(CPacket* packet)
 {
     g_PacketPool.Free(packet);
 }
