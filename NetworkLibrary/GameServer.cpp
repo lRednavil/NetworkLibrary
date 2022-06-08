@@ -7,6 +7,14 @@
 #pragma comment(lib, "Winmm")
 
 #pragma region UnitClass
+CUnitClass::CUnitClass()
+{
+    joinQ = new CLockFreeQueue<DWORD64>;
+}
+CUnitClass::~CUnitClass()
+{
+    delete joinQ;
+}
 void CUnitClass::InitClass(WORD targetFrame, BYTE endOpt)
 {
     frameDelay = 1000 / targetFrame;
@@ -69,8 +77,6 @@ bool CGameServer::MoveClass(const WCHAR* tagName, DWORD64 sessionID, WORD classI
         return false;
     }
 
-    session->isMoving = true;
-    
     //thread 탐색
     for (tcbIdx = 0; tcbIdx < tcbCnt; ++tcbIdx) {
         if (wcscmp(tagName, tcbArray[tcbIdx].tagName) != 0)
@@ -111,6 +117,7 @@ bool CGameServer::MoveClass(const WCHAR* tagName, DWORD64 sessionID, WORD classI
 END:
     if (destUnit != NULL) {
         //기존 클래스에 퇴장 신호
+        session->isMoving = true;
         session->belongClass->OnClientLeave(sessionID);
         InterlockedDecrement16((short*)&session->belongClass->currentUser);
 
@@ -119,8 +126,9 @@ END:
 
         destUnit->isAwake = true;
 
-        //이동 클래스에 입장 신호
-        session->belongClass->OnClientJoin(sessionID);
+        //이동 클래스에 입장 입력
+        session->belongClass->joinQ->Enqueue(sessionID);
+        SetEvent(session->belongThread->hEvent);
     }
 
     LoseSession(session);
@@ -143,10 +151,6 @@ bool CGameServer::MoveClass(const WCHAR* tagName, DWORD64* sessionIDs, WORD sess
             delete[] sessionArr;
             break;
         }
-    }
-
-    for (sessionIdx = 0; sessionIdx < sessionCnt; sessionIdx++) {
-        sessionArr[sessionIdx]->isMoving = true;
     }
 
     //thread 탐색
@@ -186,21 +190,25 @@ bool CGameServer::MoveClass(const WCHAR* tagName, DWORD64* sessionIDs, WORD sess
     }
 
 END:
-	for (sessionIdx = 0; sessionIdx < sessionCnt; sessionIdx++) {
-		if (destUnit != NULL) {
-			//기존 클래스에 퇴장 신호
+
+    if (destUnit != NULL) {
+		for (sessionIdx = 0; sessionIdx < sessionCnt; sessionIdx++) {
+            sessionArr[sessionIdx]->isMoving = true;
+            //기존 클래스에 퇴장 신호
 			sessionArr[sessionIdx]->belongClass->OnClientLeave(sessionIDs[sessionIdx]);
 			InterlockedDecrement16((short*)&sessionArr[sessionIdx]->belongClass->currentUser);
 
 			sessionArr[sessionIdx]->belongThread = tcb;
 			sessionArr[sessionIdx]->belongClass = destUnit;
 
-			//이동 클래스에 입장 신호
-			sessionArr[sessionIdx]->belongClass->OnClientJoin(sessionIDs[sessionIdx]);
-		}
+			//이동 클래스에 입장 입력
+			sessionArr[sessionIdx]->belongClass->joinQ->Enqueue(sessionIDs[sessionIdx]);
+            
+            LoseSession(sessionArr[sessionIdx]);
+        }
 
-        LoseSession(sessionArr[sessionIdx]);
-	}
+        SetEvent(tcb->hEvent);
+    }
 
     return destUnit == NULL;
 }
@@ -232,9 +240,8 @@ bool CGameServer::FollowClass(DWORD64 targetID, DWORD64 followID)
         follower->belongClass = target->belongClass;
 
         //이동 클래스에 입장 신호
-        follower->belongClass->OnClientJoin(followID);
-        follower->isMoving = false;
-
+        follower->belongClass->joinQ->Enqueue(followID);
+        SetEvent(follower->belongThread->hEvent);
         res = true;
     } while (0);
 
@@ -748,10 +755,9 @@ unsigned int __stdcall CGameServer::UnitProc(void* arg)
     int cnt;
     int lim;
 
-
-
     while (server->isServerOn) {
         WaitForSingleObject(tcb->hEvent, TIMER_PRECISION);
+        ResetEvent(tcb->hEvent);
 
         lim = min(tcb->currentUnits, tcb->max_class_unit);
 
@@ -769,7 +775,10 @@ unsigned int __stdcall CGameServer::UnitProc(void* arg)
                 //frameDelay 미만의 시간이 지난 경우 바로 return
                 unit->FrameUpdate();
             }
+
+            server->UnitJoinProc(unit);
         }
+
     }
 
     //동적할당되므로 삭제처리
@@ -852,7 +861,6 @@ void CGameServer::RecvProc(SESSION* session)
 		packet->MoveReadPos(sizeof(netHeader));
 
         session->belongClass->OnRecv(session->sessionID, packet);
-        
 	}
 
     if(session->isMoving == false)
@@ -983,6 +991,17 @@ bool CGameServer::SendPost(SESSION* session)
     return true;
 }
 
+void CGameServer::UnitJoinProc(CUnitClass* unit)
+{
+    DWORD64 sessionID;
+    SESSION* session;
+    while (unit->joinQ->Dequeue(&sessionID)) {
+        unit->OnClientJoin(sessionID);
+        session->isMoving = false;
+        RecvPost(FindSession(sessionID));
+    }
+}
+
 bool CGameServer::Start(WCHAR* IP, DWORD port, DWORD createThreads, DWORD runningThreads, bool isNagle, DWORD maxConnect)
 {
     if (NetInit(IP, port, isNagle) == false) {
@@ -1104,3 +1123,4 @@ void CGameServer::SetTimeOut(DWORD64 sessionID, DWORD timeVal)
     session->timeOutVal = timeVal;
     LoseSession(session);
 }
+

@@ -20,6 +20,9 @@ public:
 	};
 
 public:
+	CUnitClass();
+	virtual ~CUnitClass();
+
 	void InitClass(WORD targetFrame, BYTE endOpt);
 	
 	//server참조 함수들
@@ -60,12 +63,15 @@ public:
 
 private:
 	//classInfos
-	bool isAwake;
-	WORD frameDelay; //1초 / targetFrame
-	WORD currentUser;
+	bool isAwake = false;
+	WORD currentUser = 0;
 	WORD maxUser;
 	DWORD lastTime;
-
+	
+	//readonly
+	alignas(64)
+	CLockFreeQueue<DWORD64>* joinQ;
+	WORD frameDelay; //1초 / targetFrame
 	BYTE endOption;
 	CGameServer* server = nullptr;
 };
@@ -164,6 +170,9 @@ private:
 	void RecvProc(SESSION* session);
 	bool RecvPost(SESSION* session);
 	bool SendPost(SESSION* session);
+
+	//Class이동 보충용 함수
+	void UnitJoinProc(CUnitClass* unit);
 
 protected:
 	//sessionID 겸용
