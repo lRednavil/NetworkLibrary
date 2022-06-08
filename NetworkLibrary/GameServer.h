@@ -28,19 +28,19 @@ public:
 	//server참조 함수들
 	
 	//1인 이동용
-	inline bool MoveClass(const WCHAR* className, DWORD64 sessionID, WORD classIdx);
+	bool MoveClass(const WCHAR* className, DWORD64 sessionID, WORD classIdx);
 	//다수 이동용
-	inline bool MoveClass(const WCHAR* className, DWORD64* sessionIDs, WORD sessionCnt, WORD classIdx);
-	inline bool FollowClass(DWORD64 targetID, DWORD64 followID);
+	bool MoveClass(const WCHAR* className, DWORD64* sessionIDs, WORD sessionCnt, WORD classIdx);
+	bool FollowClass(DWORD64 targetID, DWORD64 followID);
 
-	inline bool Disconnect(DWORD64 sessionID);
-	inline bool SendPacket(DWORD64 sessionID, CPacket* packet);
+	bool Disconnect(DWORD64 sessionID);
+	bool SendPacket(DWORD64 sessionID, CPacket* packet);
 
 	//기본 참조카운트 1부여 및 초기화 실행
-	inline CPacket* PacketAlloc();
-	inline void	PacketFree(CPacket* packet);
+	CPacket* PacketAlloc();
+	void	PacketFree(CPacket* packet);
 
-	inline void SetTimeOut(DWORD64 sessionID, DWORD timeVal);
+	void SetTimeOut(DWORD64 sessionID, DWORD timeVal);
 
 	//virtual함수 영역
 	virtual void OnClientJoin(DWORD64 sessionID) = 0;
