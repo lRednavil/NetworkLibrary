@@ -123,7 +123,6 @@ END:
         session->belongClass->OnClientJoin(sessionID);
     }
 
-    session->isMoving = false;
     LoseSession(session);
 
     return destUnit == NULL;
@@ -141,7 +140,7 @@ bool CGameServer::MoveClass(const WCHAR* tagName, DWORD64* sessionIDs, WORD sess
     for (sessionIdx = 0; sessionIdx < sessionCnt; sessionIdx++) {
         sessionArr[sessionIdx] = AcquireSession(sessionIDs[sessionIdx]);
         if (sessionArr[sessionIdx] == NULL) {
-            delete sessionArr;
+            delete[] sessionArr;
             break;
         }
     }
@@ -199,7 +198,6 @@ END:
 			//이동 클래스에 입장 신호
 			sessionArr[sessionIdx]->belongClass->OnClientJoin(sessionIDs[sessionIdx]);
 		}
-        sessionArr[sessionIdx]->isMoving = false;
 
         LoseSession(sessionArr[sessionIdx]);
 	}
