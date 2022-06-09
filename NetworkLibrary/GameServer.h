@@ -101,6 +101,9 @@ private:
 	};
 
 public:
+	CGameServer();
+	virtual ~CGameServer();
+
 	//오픈 IP / 포트 / 워커스레드 수(생성수, 러닝수) / 나글옵션 / 최대접속자 수
 	bool Start(WCHAR* IP, DWORD port, DWORD createThreads, DWORD runningThreads, bool isNagle, DWORD maxConnect);
 	void Stop();

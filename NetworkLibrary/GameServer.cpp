@@ -28,6 +28,8 @@ class CDefautClass : public CUnitClass {
 };
 
 CDefautClass g_defaultClass;
+CUSTOM_TCB* g_defaultTCB;
+#define DEFAULT_THREAD L"LIB_DEFAULT_THREAD"
 
 #pragma region UnitClass
 CUnitClass::CUnitClass()
@@ -87,6 +89,22 @@ void CUnitClass::SetTimeOut(DWORD64 sessionID, DWORD timeVal)
 }
 
 #pragma endregion
+CGameServer::CGameServer()
+{
+    AttatchClass(DEFAULT_THREAD, &g_defaultClass);
+    int tcbIdx;
+
+    //thread Å½»ö
+    for (tcbIdx = 0; tcbIdx < tcbCnt; ++tcbIdx) {
+        if (wcscmp(DEFAULT_THREAD, tcbArray[tcbIdx].tagName) != 0)
+            continue;
+
+        if (tcbArray[tcbIdx].currentUnits == tcbArray[tcbIdx].max_class_unit)
+            continue;
+
+        g_defaultTCB = &tcbArray[tcbIdx];
+    }
+}
 
 bool CGameServer::MoveClass(const WCHAR* tagName, DWORD64 sessionID, WORD classIdx)
 {
@@ -642,11 +660,9 @@ unsigned int __stdcall CGameServer::WorkProc(void* arg)
         }
         //disconnectÀÇ °æ¿ì
         if ((__int64)overlap == OV_DISCONNECT) {
-            if (session->belongClass != NULL) {
-                session->belongClass->OnClientLeave(sessionID);
-                InterlockedDecrement16((short*)&session->belongClass->currentUser);
-            }
-            server->sessionStack.Push(session->sessionID >> MASK_SHIFT);
+			session->belongClass->OnClientLeave(sessionID);
+			InterlockedDecrement16((short*)&session->belongClass->currentUser);
+			server->sessionStack.Push(session->sessionID >> MASK_SHIFT);
             continue;
         }
 
@@ -1060,6 +1076,8 @@ bool CGameServer::Start(WCHAR* IP, DWORD port, DWORD createThreads, DWORD runnin
         sessionStack.~CLockFreeStack();
         return false;
     }
+
+    AttatchClass(L"", &g_defaultClass);
 
     return true;
 }
