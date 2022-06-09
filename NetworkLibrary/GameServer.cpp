@@ -27,18 +27,16 @@ class CDefautClass : public CUnitClass {
     virtual void FrameUpdate() {};
 };
 
-CDefautClass g_defaultClass;
-CUSTOM_TCB* g_defaultTCB;
-#define DEFAULT_THREAD L"LIB_DEFAULT_THREAD"
-
 #pragma region UnitClass
 CUnitClass::CUnitClass()
 {
     joinQ = new CLockFreeQueue<DWORD64>;
+    leaveQ = new CLockFreeQueue<DWORD64>;
 }
 CUnitClass::~CUnitClass()
 {
     delete joinQ;
+    delete leaveQ;
 }
 void CUnitClass::InitClass(WORD targetFrame, BYTE endOpt)
 {
@@ -89,21 +87,20 @@ void CUnitClass::SetTimeOut(DWORD64 sessionID, DWORD timeVal)
 }
 
 #pragma endregion
+
+CDefautClass g_defaultClass;
+CUSTOM_TCB g_defaultTCB;
+
 CGameServer::CGameServer()
 {
-    AttatchClass(DEFAULT_THREAD, &g_defaultClass);
-    int tcbIdx;
+    //default tcb의 생성 과정
+    g_defaultTCB.max_class_unit = 1;
+    g_defaultTCB.classList = new CUnitClass*;
+    g_defaultTCB.classList[0] = &g_defaultClass;
+    g_defaultTCB.hEvent = (HANDLE)(HANDLE)CreateEvent(NULL, TRUE, FALSE, NULL);
 
-    //thread 탐색
-    for (tcbIdx = 0; tcbIdx < tcbCnt; ++tcbIdx) {
-        if (wcscmp(DEFAULT_THREAD, tcbArray[tcbIdx].tagName) != 0)
-            continue;
-
-        if (tcbArray[tcbIdx].currentUnits == tcbArray[tcbIdx].max_class_unit)
-            continue;
-
-        g_defaultTCB = &tcbArray[tcbIdx];
-    }
+    TCB_TO_THREAD* arg = new TCB_TO_THREAD{ this, &g_defaultTCB};
+    _beginthreadex(NULL, 0, UnitProc, arg, 0, NULL);
 }
 
 CGameServer::~CGameServer()
@@ -580,6 +577,7 @@ bool CGameServer::MakeSession(WCHAR* IP, SOCKET sock, DWORD64* ID)
     session->lastTime = currentTime;
 
     session->belongClass = &g_defaultClass;
+    session->belongThread = &g_defaultTCB;
 
     //recv용 ioCount증가
     InterlockedIncrement(&session->ioCnt);
