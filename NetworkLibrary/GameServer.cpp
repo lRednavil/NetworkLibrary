@@ -6,6 +6,29 @@
 
 #pragma comment(lib, "Winmm")
 
+class CDefautClass : public CUnitClass {
+    //virtual함수 영역
+    virtual void OnClientJoin(DWORD64 sessionID) {};
+    virtual void OnClientLeave(DWORD64 sessionID) {};
+
+    //message 분석 역할
+    //메세지 헤더는 알아서 검증할 것
+    //업데이트 스레드 처리 필요시 jobQ에 enQ할것
+    virtual void OnRecv(DWORD64 sessionID, CPacket* packet) {};
+
+    virtual void OnTimeOut(DWORD64 sessionID) {};
+
+    virtual void OnError(int error, const WCHAR* msg) {};
+
+    //gameserver용
+    //jobQ에 EnQ된 메세지들 처리
+    virtual void MsgUpdate() {};
+    //frame단위의 업데이트 처리
+    virtual void FrameUpdate() {};
+};
+
+CDefautClass g_defaultClass;
+
 #pragma region UnitClass
 CUnitClass::CUnitClass()
 {
@@ -531,8 +554,10 @@ bool CGameServer::MakeSession(WCHAR* IP, SOCKET sock, DWORD64* ID)
     ZeroMemory(&session->sendOver, sizeof(session->sendOver));
     session->sendOver.type = 1;
 
-    session->isMoving = false;
+    session->isMoving = true;
     session->lastTime = currentTime;
+
+    session->belongClass = &g_defaultClass;
 
     //recv용 ioCount증가
     InterlockedIncrement(&session->ioCnt);
