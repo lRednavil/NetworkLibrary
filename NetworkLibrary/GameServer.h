@@ -23,7 +23,7 @@ public:
 	CUnitClass();
 	virtual ~CUnitClass();
 
-	void InitClass(WORD targetFrame, BYTE endOpt);
+	void InitClass(WORD targetFrame, BYTE endOpt, WORD maxUser);
 	
 	//server참조 함수들
 	
