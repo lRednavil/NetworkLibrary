@@ -3,8 +3,8 @@
 struct SESSION;
 class CPacket;
 
-class CProcessMontior;
-class CProcessorMontior;
+class CProcessMonitor;
+class CProcessorMonitor;
 
 class CGameServer;
 
@@ -20,24 +20,27 @@ public:
 	};
 
 public:
+	CUnitClass();
+	virtual ~CUnitClass();
+
 	void InitClass(WORD targetFrame, BYTE endOpt);
 	
 	//server참조 함수들
 	
 	//1인 이동용
-	inline bool MoveClass(const WCHAR* className, DWORD64 sessionID, WORD classIdx);
+	bool MoveClass(const WCHAR* className, DWORD64 sessionID, WORD classIdx = -1);
 	//다수 이동용
-	inline bool MoveClass(const WCHAR* className, DWORD64* sessionIDs, WORD sessionCnt, WORD classIdx);
-	inline bool FollowClass(DWORD64 targetID, DWORD64 followID);
+	bool MoveClass(const WCHAR* className, DWORD64* sessionIDs, WORD sessionCnt, WORD classIdx = -1);
+	bool FollowClass(DWORD64 targetID, DWORD64 followID);
 
-	inline bool Disconnect(DWORD64 sessionID);
-	inline bool SendPacket(DWORD64 sessionID, CPacket* packet);
+	bool Disconnect(DWORD64 sessionID);
+	bool SendPacket(DWORD64 sessionID, CPacket* packet);
 
 	//기본 참조카운트 1부여 및 초기화 실행
-	inline CPacket* PacketAlloc();
-	inline void	PacketFree(CPacket* packet);
+	CPacket* PacketAlloc();
+	void	PacketFree(CPacket* packet);
 
-	inline void SetTimeOut(DWORD64 sessionID, DWORD timeVal);
+	void SetTimeOut(DWORD64 sessionID, DWORD timeVal);
 
 	//virtual함수 영역
 	virtual void OnClientJoin(DWORD64 sessionID) = 0;
@@ -60,12 +63,16 @@ public:
 
 private:
 	//classInfos
-	bool isAwake;
-	WORD frameDelay; //1초 / targetFrame
-	WORD currentUser;
+	bool isAwake = false;
+	WORD currentUser = 0;
 	WORD maxUser;
 	DWORD lastTime;
-
+	
+	//readonly
+	alignas(64)
+	CLockFreeQueue<DWORD64>* joinQ;
+	CLockFreeQueue<DWORD64>* leaveQ;
+	WORD frameDelay; //1초 / targetFrame
 	BYTE endOption;
 	CGameServer* server = nullptr;
 };
@@ -121,8 +128,8 @@ public:
 
 	
 	//gameServer용 함수
-	bool MoveClass(const WCHAR* tagName, DWORD64 sessionID, WORD classIdx);
-	bool MoveClass(const WCHAR* tagName, DWORD64* sessionIDs, WORD sessionCnt, WORD classIdx);
+	bool MoveClass(const WCHAR* tagName, DWORD64 sessionID, WORD classIdx = -1);
+	bool MoveClass(const WCHAR* tagName, DWORD64* sessionIDs, WORD sessionCnt, WORD classIdx = -1);
 	bool FollowClass(DWORD64 targetID, DWORD64 followID);
 
 	//같은 tagName의 tcb존재시 유효여부 판단 후 부착 or 새로운 tcb 생성 및 스레드 생성
@@ -164,6 +171,9 @@ private:
 	void RecvProc(SESSION* session);
 	bool RecvPost(SESSION* session);
 	bool SendPost(SESSION* session);
+
+	//Class이동 보충용 함수
+	void UnitJoinLeaveProc(CUnitClass* unit);
 
 protected:
 	//sessionID 겸용
