@@ -192,7 +192,7 @@ protected:
 	DWORD currentTime;
 	
 	//gameserver전용 컨테이너
-	CUSTOM_TCB tcbArray[500];
+	CUSTOM_TCB* tcbArray;
 	DWORD tcbCnt = 0;
 
 private:

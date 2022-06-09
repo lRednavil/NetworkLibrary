@@ -1021,6 +1021,8 @@ bool CGameServer::Start(WCHAR* IP, DWORD port, DWORD createThreads, DWORD runnin
     sessionCnt = 0;
     maxConnection = maxConnect;
 
+    tcbArray = new CUSTOM_TCB[500];
+
     for (int cnt = 0; cnt < maxConnect; cnt++) {
         sessionStack.Push(cnt);
     }
