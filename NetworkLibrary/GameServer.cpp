@@ -106,6 +106,10 @@ CGameServer::CGameServer()
     }
 }
 
+CGameServer::~CGameServer()
+{
+}
+
 bool CGameServer::MoveClass(const WCHAR* tagName, DWORD64 sessionID, WORD classIdx)
 {
     SESSION* session = AcquireSession(sessionID);
