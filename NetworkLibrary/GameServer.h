@@ -8,6 +8,8 @@ class CProcessorMonitor;
 
 class CGameServer;
 
+struct MOVE_INFO;
+
 //상속받아서 구현 및 사용
 class CUnitClass{
 	friend class CGameServer;
@@ -28,10 +30,11 @@ public:
 	//server참조 함수들
 	
 	//1인 이동용
-	bool MoveClass(const WCHAR* className, DWORD64 sessionID, WORD classIdx = -1);
+	//전해야 하는 정보가 있을 경우 packet을 통해 전달할 것
+	bool MoveClass(const WCHAR* className, DWORD64 sessionID, CPacket* packet = NULL, WORD classIdx = -1);
 	//다수 이동용
 	bool MoveClass(const WCHAR* className, DWORD64* sessionIDs, WORD sessionCnt, WORD classIdx = -1);
-	bool FollowClass(DWORD64 targetID, DWORD64 followID);
+	bool FollowClass(DWORD64 targetID, DWORD64 followID, CPacket* packet = NULL);
 
 	bool Disconnect(DWORD64 sessionID);
 	bool SendPacket(DWORD64 sessionID, CPacket* packet);
@@ -43,7 +46,9 @@ public:
 	void SetTimeOut(DWORD64 sessionID, DWORD timeVal);
 
 	//virtual함수 영역
-	virtual void OnClientJoin(DWORD64 sessionID) = 0;
+	//packet이 있는 경우 사용만 하고 해제하지 말 것
+	virtual void OnClientJoin(DWORD64 sessionID, CPacket* packet) = 0;
+	//packet이 있는 경우 사용만 하고 해제하지 말 것
 	virtual void OnClientLeave(DWORD64 sessionID) = 0;
 
 	virtual void OnClientDisconnected(DWORD64 sessionID) = 0;
@@ -72,8 +77,8 @@ private:
 	
 	//readonly
 	alignas(64)
-	CLockFreeQueue<DWORD64>* joinQ;
-	CLockFreeQueue<DWORD64>* leaveQ;
+	CLockFreeQueue<MOVE_INFO>* joinQ;
+	CLockFreeQueue<MOVE_INFO>* leaveQ;
 	WORD frameDelay; //1초 / targetFrame
 	BYTE endOption;
 	CGameServer* server = nullptr;
@@ -133,9 +138,9 @@ public:
 
 	
 	//gameServer용 함수
-	bool MoveClass(const WCHAR* tagName, DWORD64 sessionID, WORD classIdx = -1);
+	bool MoveClass(const WCHAR* tagName, DWORD64 sessionID, CPacket* packet = NULL, WORD classIdx = -1);
 	bool MoveClass(const WCHAR* tagName, DWORD64* sessionIDs, WORD sessionCnt, WORD classIdx = -1);
-	bool FollowClass(DWORD64 targetID, DWORD64 followID);
+	bool FollowClass(DWORD64 targetID, DWORD64 followID, CPacket* packet = NULL);
 
 	//같은 tagName의 tcb존재시 유효여부 판단 후 부착 or 새로운 tcb 생성 및 스레드 생성
 	void AttatchClass(const WCHAR* tagName, CUnitClass* const classPtr, const WORD maxUnitCnt = 1);
