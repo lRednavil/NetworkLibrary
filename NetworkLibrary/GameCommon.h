@@ -62,7 +62,7 @@ struct SESSION {
 
 
 #pragma pack(push, 1)
-struct NET_HEADER {
+struct GAME_PACKET_HEADER {
 	BYTE staticCode;
 	WORD len;
 	BYTE randomKey;
