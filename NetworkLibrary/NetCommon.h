@@ -36,6 +36,8 @@ struct SESSION {
 	//timeOut용 변수들
 	DWORD lastTime;
 	DWORD timeOutVal;
+	bool isTimeOutReserved = false;
+	bool isDisconnectReserved = false;
 
 	//send 후 해제용
 	CPacket* sendBuf[SEND_PACKET_MAX];
