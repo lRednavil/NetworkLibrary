@@ -11,6 +11,8 @@ class CDefautClass : public CUnitClass {
     virtual void OnClientJoin(DWORD64 sessionID) {};
     virtual void OnClientLeave(DWORD64 sessionID) {};
 
+    virtual void OnClientDisconnected(DWORD64 sessionID) {};
+
     //message 분석 역할
     //메세지 헤더는 알아서 검증할 것
     //업데이트 스레드 처리 필요시 jobQ에 enQ할것
@@ -663,7 +665,7 @@ unsigned int __stdcall CGameServer::WorkProc(void* arg)
         }
         //disconnect의 경우
         if ((__int64)overlap == OV_DISCONNECT) {
-			session->belongClass->OnClientLeave(sessionID);
+			session->belongClass->OnClientDisconnected(sessionID);
 			InterlockedDecrement16((short*)&session->belongClass->currentUser);
 			server->sessionStack.Push(session->sessionID >> MASK_SHIFT);
             continue;

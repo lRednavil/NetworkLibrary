@@ -46,6 +46,8 @@ public:
 	virtual void OnClientJoin(DWORD64 sessionID) = 0;
 	virtual void OnClientLeave(DWORD64 sessionID) = 0;
 
+	virtual void OnClientDisconnected(DWORD64 sessionID) = 0;
+
 	//message 분석 역할
 	//메세지 헤더는 알아서 검증할 것
 	//업데이트 스레드 처리 필요시 jobQ에 enQ할것
