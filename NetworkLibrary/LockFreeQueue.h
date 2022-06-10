@@ -28,9 +28,13 @@ private:
 	//MemoryPool°ú CacheLine ºÐ¸®
 	alignas(64)
 	QUEUE_NODE<DATA>* volatile headNode;
+	alignas(64)
 	QUEUE_NODE<DATA>* volatile tailNode;
 
+	alignas(64)
 	int size;
+	
+	alignas(64)
 	unsigned int pushCnt;
 };
 

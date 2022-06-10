@@ -30,9 +30,12 @@ private:
 	//memory pool°ú ºÐ¸®
 	alignas(64)
 	STACK_NODE<DATA>* volatile topNode;
-
-	unsigned int size;
+	
+	alignas(64)
 	unsigned long long pushCnt = 0;
+
+	alignas(64)
+	unsigned int size;
 };
 
 template<class DATA>

@@ -40,15 +40,15 @@ public:
 
 private:
 	POOLHEADER* topNode;
-
-	int capacity;
+	alignas(64)
 	int useCount;
-
+	alignas(64)
 	long allocTry;
 
 	//read field
 	alignas(64)
 	bool newCall;
+	int capacity;
 };
 
 template<class DATA>

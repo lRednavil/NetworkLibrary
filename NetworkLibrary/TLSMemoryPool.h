@@ -44,8 +44,10 @@ private:
 	//write field
 	alignas(64)
 	int capacity;
+	alignas(64)
 	int useCount;
 
+	alignas(64)
 	long allocTry;
 };
 
