@@ -23,9 +23,12 @@ struct SESSION {
 	OVERLAPPEDEX recvOver;
 	OVERLAPPEDEX sendOver;
 	//session refCnt의 역할
+	alignas(64)
 	DWORD64 ioCnt;
+	alignas(64)
 	bool isSending;
 	//네트워크 메세지용 버퍼들
+	alignas(64)
 	CRingBuffer recvQ;
 	CLockFreeQueue<CPacket*> sendQ;
 	DWORD64 sessionID;
@@ -40,6 +43,7 @@ struct SESSION {
 	DWORD sendCnt; // << 보낸 메세지수 확보
 
 	//readonly
+	alignas(64)
 	SOCKET sock;
 	WCHAR IP[16];
 

@@ -50,12 +50,10 @@ void CNetServer::Monitor()
     wprintf_s(L"Total Accept : %llu \n", totalAccept);
     wprintf_s(L"Total Send : %llu \n", totalSend);
     wprintf_s(L"Total Recv : %llu \n", totalRecv);
-    wprintf_s(L"Total Release : %llu \n", totalRelease);
     wprintf_s(L"=============================\n");
     wprintf_s(L"Accept TPS : %llu \n", totalAccept - lastAccept);
     wprintf_s(L"Send TPS : %llu \n", totalSend - lastSend);
     wprintf_s(L"Recv TPS : %llu \n", totalRecv - lastRecv);
-    wprintf_s(L"Release TPS : %llu \n", totalRelease - lastRelease);
     wprintf_s(L"=============================\n");
     wprintf_s(L"Current Sessions : %lu \n", sessionCnt);
 
@@ -76,7 +74,6 @@ void CNetServer::Monitor()
     lastAccept = totalAccept;
     lastSend = totalSend;
     lastRecv = totalRecv;
-    lastRelease = totalRelease;
 }
 
 bool CNetServer::Disconnect(DWORD64 sessionID)
@@ -364,8 +361,8 @@ bool CNetServer::MakeSession(WCHAR* IP, SOCKET sock, DWORD64* ID)
 
     session = &sessionArr[sessionID_high];
 
-    //session->sock = sock;
-    InterlockedExchange64((__int64*)&session->sock, sock);
+    session->sock = sock;
+    //InterlockedExchange64((__int64*)&session->sock, sock);
 
     wmemmove_s(session->IP, 16, IP, 16);
     session->sessionID = *ID = sessionID;
@@ -408,8 +405,6 @@ void CNetServer::ReleaseSession(SESSION* session)
     CPacket* packet;
 
     closesocket(sock & ~RELEASE_FLAG);
-
-    InterlockedIncrement64((__int64*)&totalRelease);
 
     //³²Àº Q Âî²¨±â Á¦°Å
     while (session->sendQ.Dequeue(&packet))
@@ -672,7 +667,7 @@ bool CNetServer::RecvPost(SESSION* session)
     pBuf[0] = { len, recvQ->GetRearBufferPtr() };
     pBuf[1] = { recvQ->GetFreeSize() - len, recvQ->GetBufferPtr() };
 
-    ret = WSARecv(InterlockedOr64((__int64*)&session->sock, 0), pBuf, 2, NULL, &flag, (LPWSAOVERLAPPED)&session->recvOver, NULL);
+    ret = WSARecv(session->sock, pBuf, 2, NULL, &flag, (LPWSAOVERLAPPED)&session->recvOver, NULL);
 
     if (ret == SOCKET_ERROR) {
         err = WSAGetLastError();
@@ -745,7 +740,7 @@ bool CNetServer::SendPost(SESSION* session)
         pBuf[cnt].len = packet->GetDataSize();
     }
 
-    ret = WSASend(InterlockedOr64((__int64*)&session->sock, 0), pBuf, session->sendCnt, NULL, 0, (LPWSAOVERLAPPED)&session->sendOver, NULL);
+    ret = WSASend(session->sock, pBuf, session->sendCnt, NULL, 0, (LPWSAOVERLAPPED)&session->sendOver, NULL);
 
     if (ret == SOCKET_ERROR) {
         err = WSAGetLastError();
