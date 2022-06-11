@@ -160,13 +160,24 @@ CPacket* CNetServer::PacketAlloc()
 void CNetServer::HeaderAlloc(CPacket* packet)
 {
     if (packet->isEncoded) return;
-    PROFILE_START(HeaderAlloc);
-
-    NET_HEADER* header = (NET_HEADER*)packet->GetBufferPtr();
-    header->staticCode = STATIC_CODE;
-    header->len = packet->GetDataSize() - sizeof(NET_HEADER);
-    header->randomKey = rand();
-    header->checkSum = MakeCheckSum(packet);
+    
+	NET_HEADER* header = (NET_HEADER*)packet->GetBufferPtr();
+	{
+        PROFILE_START(HeaderAlloc_STATIC_CODE);
+        header->staticCode = STATIC_CODE;
+	}
+	{
+        PROFILE_START(HeaderAlloc_LEN);
+        header->len = packet->GetDataSize() - sizeof(NET_HEADER);
+	}
+	{
+        PROFILE_START(HeaderAlloc_RANDOM_KEY);
+        header->randomKey = rand();
+	}
+	{
+        PROFILE_START(HeaderAlloc_CHECKSUM);
+		header->checkSum = MakeCheckSum(packet);
+	}
 }
 
 BYTE CNetServer::MakeCheckSum(CPacket* packet)
@@ -192,20 +203,21 @@ void CNetServer::Encode(CPacket* packet)
 
     NET_HEADER* header = (NET_HEADER*)packet->GetBufferPtr();
     BYTE* ptr = (BYTE*)&header->checkSum;
-    BYTE key = STATIC_KEY;
+    BYTE key = STATIC_KEY + 1;
     WORD len = header->len;
-    BYTE randKey = header->randomKey;
+    BYTE randKey = header->randomKey + 1;
 
     WORD cnt;
+    WORD cur;
 
-    ptr[0] ^= randKey + 1;
-    for (cnt = 1; cnt <= len; ++cnt) {
-        ptr[cnt] ^= ptr[cnt - 1] + randKey + cnt + 1;
+    ptr[0] ^= randKey;
+    for (cur = 0, cnt = 1; cnt <= len; ++cur, ++cnt) {
+        ptr[cnt] ^= ptr[cur] + randKey + cnt;
     }
 
-    ptr[0] ^= key + 1;
-    for (cnt = 1; cnt <= len; ++cnt) {
-        ptr[cnt] ^= ptr[cnt - 1] + key + cnt + 1;
+    ptr[0] ^= key;
+    for (cur = 0, cnt = 1; cnt <= len; ++cur, ++cnt){
+        ptr[cnt] ^= ptr[cur] + key + cnt;
     }
 }
 

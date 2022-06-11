@@ -56,6 +56,7 @@ CTimeTracker::CTimeTracker(const WCHAR* name)
 		if (track->isAlive == false) {
 			track->isAlive = true;
 			track->callCnt = 0;
+			track->totalTime.QuadPart = 0;
 			track->minTime.QuadPart = MAXLONGLONG;
 			track->maxTime.QuadPart = 0;
 			wmemmove_s(track->flagName, NAME_MAX, name, NAME_MAX);
