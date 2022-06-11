@@ -144,7 +144,7 @@
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <Optimization>Disabled</Optimization>
       <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
-      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
     </ClCompile>
     <Link>
       <SubSystem>
@@ -176,6 +176,7 @@
     <ClInclude Include="ProcessorMonitor.h" />
     <ClInclude Include="RingBuffer.h" />
     <ClInclude Include="SerializedBuffer.h" />
+    <ClInclude Include="TimeTracker.h" />
     <ClInclude Include="TLSMemoryPool.h" />
   </ItemGroup>
   <ItemGroup>
@@ -204,6 +205,7 @@
     <ClCompile Include="ProcessorMonitor.cpp" />
     <ClCompile Include="RingBuffer.cpp" />
     <ClCompile Include="SerialzedBuffer.cpp" />
+    <ClCompile Include="TimeTracker.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

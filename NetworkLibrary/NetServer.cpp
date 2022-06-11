@@ -3,6 +3,9 @@
 #include "NetCommon.h"
 #include <timeapi.h>
 
+#define PROFILE_MODE
+#include "TimeTracker.h"
+
 #pragma comment(lib, "Winmm")
 
 bool CNetServer::Start(WCHAR* IP, DWORD port, DWORD createThreads, DWORD runningThreads, bool isNagle, DWORD maxConnect)
@@ -100,7 +103,10 @@ bool CNetServer::SendPacket(DWORD64 sessionID, CPacket* packet)
 
     HeaderAlloc(packet);
     Encode(packet);
-    session->sendQ.Enqueue(packet);
+    {
+        PROFILE_START(L"SendEnQ");
+        session->sendQ.Enqueue(packet);
+    }
     SendPost(session);
     return true;
 }
@@ -154,6 +160,7 @@ CPacket* CNetServer::PacketAlloc()
 void CNetServer::HeaderAlloc(CPacket* packet)
 {
     if (packet->isEncoded) return;
+    PROFILE_START(L"HeaderAlloc");
 
     NET_HEADER* header = (NET_HEADER*)packet->GetBufferPtr();
     header->staticCode = STATIC_CODE;
@@ -179,6 +186,7 @@ BYTE CNetServer::MakeCheckSum(CPacket* packet)
 void CNetServer::Encode(CPacket* packet)
 {
     if (packet->isEncoded) return;
+    PROFILE_START(L"Encode");
 
     packet->isEncoded = true;
 
@@ -231,6 +239,7 @@ void CNetServer::PacketFree(CPacket* packet)
 
 void CNetServer::SetTimeOut(DWORD64 sessionID, DWORD timeVal, bool recvTimeReset)
 {
+    PROFILE_START(L"SetTimeOut");
     SESSION* session = AcquireSession(sessionID);
 
     if (session == NULL) {
@@ -546,6 +555,7 @@ unsigned int __stdcall CNetServer::WorkProc(void* arg)
 
 unsigned int __stdcall CNetServer::AcceptProc(void* arg)
 {
+    PROFILE_START(L"Accept");
     SOCKADDR_IN addr;
     SOCKET sock;
     WCHAR IP[16];
@@ -599,19 +609,22 @@ unsigned int __stdcall CNetServer::TimerProc(void* arg)
     Sleep(1000);
 
     while (server->isServerOn) {
-        server->currentTime = timeGetTime();
-        
-        for (cnt = 0; cnt < server->maxConnection; ++cnt) {
-            session = &server->sessionArr[cnt];
+        {
+            PROFILE_START(L"Timer");
 
-            if (session->ioCnt & RELEASE_FLAG) continue;
+            server->currentTime = timeGetTime();
 
-            if (server->currentTime - session->lastTime >= session->timeOutVal) {
-                server->Disconnect(session->sessionID);
-                server->OnTimeOut(session->sessionID, session->isTimeOutReserved);
+            for (cnt = 0; cnt < server->maxConnection; ++cnt) {
+                session = &server->sessionArr[cnt];
+
+                if (session->ioCnt & RELEASE_FLAG) continue;
+
+                if (server->currentTime - session->lastTime >= session->timeOutVal) {
+                    server->Disconnect(session->sessionID);
+                    server->OnTimeOut(session->sessionID, session->isTimeOutReserved);
+                }
             }
         }
-
         Sleep(1000);
     }
 
@@ -620,6 +633,7 @@ unsigned int __stdcall CNetServer::TimerProc(void* arg)
 
 void CNetServer::RecvProc(SESSION* session)
 {
+    PROFILE_START(L"RecvProc");
     //Packet ¶¼±â (netHeader Á¦°Å)
     NET_HEADER netHeader;
     NET_HEADER* header;
@@ -714,7 +728,7 @@ bool CNetServer::RecvPost(SESSION* session)
     pBuf[0] = { len, recvQ->GetRearBufferPtr() };
     pBuf[1] = { recvQ->GetFreeSize() - len, recvQ->GetBufferPtr() };
 
-    ret = WSARecv(InterlockedOr64((__int64*)session->sock, 0), pBuf, 2, NULL, &flag, (LPWSAOVERLAPPED)&session->recvOver, NULL);
+    ret = WSARecv(InterlockedOr64((__int64*)&session->sock, 0), pBuf, 2, NULL, &flag, (LPWSAOVERLAPPED)&session->recvOver, NULL);
 
     if (ret == SOCKET_ERROR) {
         err = WSAGetLastError();
@@ -751,6 +765,7 @@ bool CNetServer::RecvPost(SESSION* session)
 
 bool CNetServer::SendPost(SESSION* session)
 {
+    PROFILE_START(L"SendPost");
     int ret;
     int err;
     WORD cnt;
@@ -775,6 +790,7 @@ bool CNetServer::SendPost(SESSION* session)
         LoseSession(session);
         return false;
     }
+    PROFILE_START(L"SendPost Post Accpet");
 
     session->sendCnt = min(SEND_PACKET_MAX, sendCnt);
     ZeroMemory(pBuf, sizeof(WSABUF) * SEND_PACKET_MAX);
@@ -788,7 +804,7 @@ bool CNetServer::SendPost(SESSION* session)
         pBuf[cnt].len = packet->GetDataSize();
     }
 
-    ret = WSASend(InterlockedOr64((__int64*)session->sock, 0), pBuf, session->sendCnt, NULL, 0, (LPWSAOVERLAPPED)&session->sendOver, NULL);
+    ret = WSASend(InterlockedOr64((__int64*)&session->sock, 0), pBuf, session->sendCnt, NULL, 0, (LPWSAOVERLAPPED)&session->sendOver, NULL);
 
     if (ret == SOCKET_ERROR) {
         err = WSAGetLastError();
