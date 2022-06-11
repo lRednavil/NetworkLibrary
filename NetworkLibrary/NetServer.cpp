@@ -103,12 +103,9 @@ bool CNetServer::SendPacket(DWORD64 sessionID, CPacket* packet)
 
     HeaderAlloc(packet);
     Encode(packet);
-    {
-        PROFILE_START(SendEnQ);
-        session->sendQ.Enqueue(packet);
-    }
-    SendPost(session);
-    return true;
+	session->sendQ.Enqueue(packet);
+	SendPost(session);
+	return true;
 }
 
 bool CNetServer::SendAndDisconnect(DWORD64 sessionID, CPacket* packet)
@@ -162,22 +159,10 @@ void CNetServer::HeaderAlloc(CPacket* packet)
     if (packet->isEncoded) return;
     
 	NET_HEADER* header = (NET_HEADER*)packet->GetBufferPtr();
-	{
-        PROFILE_START(HeaderAlloc_STATIC_CODE);
-        header->staticCode = STATIC_CODE;
-	}
-	{
-        PROFILE_START(HeaderAlloc_LEN);
-        header->len = packet->GetDataSize() - sizeof(NET_HEADER);
-	}
-	{
-        PROFILE_START(HeaderAlloc_RANDOM_KEY);
-        header->randomKey = rand();
-	}
-	{
-        PROFILE_START(HeaderAlloc_CHECKSUM);
-		header->checkSum = MakeCheckSum(packet);
-	}
+	header->staticCode = STATIC_CODE;
+	header->len = packet->GetDataSize() - sizeof(NET_HEADER);
+	header->randomKey = rand();
+	header->checkSum = MakeCheckSum(packet);
 }
 
 BYTE CNetServer::MakeCheckSum(CPacket* packet)
@@ -197,7 +182,6 @@ BYTE CNetServer::MakeCheckSum(CPacket* packet)
 void CNetServer::Encode(CPacket* packet)
 {
     if (packet->isEncoded) return;
-    PROFILE_START(Encode);
 
     packet->isEncoded = true;
 
@@ -251,7 +235,6 @@ void CNetServer::PacketFree(CPacket* packet)
 
 void CNetServer::SetTimeOut(DWORD64 sessionID, DWORD timeVal, bool recvTimeReset)
 {
-    PROFILE_START(SetTimeOut);
     SESSION* session = AcquireSession(sessionID);
 
     if (session == NULL) {
@@ -567,7 +550,6 @@ unsigned int __stdcall CNetServer::WorkProc(void* arg)
 
 unsigned int __stdcall CNetServer::AcceptProc(void* arg)
 {
-    PROFILE_START(Accept);
     SOCKADDR_IN addr;
     SOCKET sock;
     WCHAR IP[16];
@@ -622,8 +604,6 @@ unsigned int __stdcall CNetServer::TimerProc(void* arg)
 
     while (server->isServerOn) {
         {
-            PROFILE_START(Timer);
-
             server->currentTime = timeGetTime();
 
             for (cnt = 0; cnt < server->maxConnection; ++cnt) {
@@ -645,7 +625,6 @@ unsigned int __stdcall CNetServer::TimerProc(void* arg)
 
 void CNetServer::RecvProc(SESSION* session)
 {
-    PROFILE_START(RecvProc);
     //Packet ¶¼±â (netHeader Á¦°Å)
     NET_HEADER netHeader;
     NET_HEADER* header;
@@ -777,7 +756,6 @@ bool CNetServer::RecvPost(SESSION* session)
 
 bool CNetServer::SendPost(SESSION* session)
 {
-    PROFILE_START(SendPost);
     int ret;
     int err;
     WORD cnt;
@@ -802,7 +780,6 @@ bool CNetServer::SendPost(SESSION* session)
         LoseSession(session);
         return false;
     }
-    PROFILE_START(SendPost_Post_Accpet);
 
     session->sendCnt = min(SEND_PACKET_MAX, sendCnt);
     ZeroMemory(pBuf, sizeof(WSABUF) * SEND_PACKET_MAX);
