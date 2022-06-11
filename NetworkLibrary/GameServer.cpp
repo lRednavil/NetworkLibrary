@@ -1060,7 +1060,8 @@ void CGameServer::UnitJoinLeaveProc(CUnitClass* unit)
         session->isMoving = false;
         RecvPost(session);
 
-        PacketFree(info.packet);
+        if(info.packet)
+            PacketFree(info.packet);
     }
 
     while (unit->leaveQ->Dequeue(&info)) {
