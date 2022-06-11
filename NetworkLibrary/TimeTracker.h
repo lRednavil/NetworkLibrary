@@ -22,10 +22,8 @@ private:
 	int trackIdx;
 };
 
-#define PROFILE_MODE
-
 #ifdef PROFILE_MODE
-#define PROFILE_START(X) CTimeTracker TIMETRACK(X)
+#define PROFILE_START(X) CTimeTracker TIMETRACK##X = CTimeTracker(L#X)
 #define PROFILE_RESET() CTimeTracker::ResetTimeTrack()
 #define PROFILE_WRITE() CTimeTracker::WriteTimeTrack()
 #else
