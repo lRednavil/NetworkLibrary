@@ -101,10 +101,19 @@ bool CNetServer::SendPacket(DWORD64 sessionID, CPacket* packet)
         return false;
     }
 
-    HeaderAlloc(packet);
-    Encode(packet);
+    if (packet->isEncoded == false) {
+        HeaderAlloc(packet);
+        Encode(packet);
+    }
 	session->sendQ.Enqueue(packet);
-	SendPost(session);
+    
+    if (session->isSending == false) {
+        SendPost(session);
+    }
+    else {
+        LoseSession(session);
+    }
+	    
 	return true;
 }
 
@@ -156,8 +165,6 @@ CPacket* CNetServer::PacketAlloc()
 
 void CNetServer::HeaderAlloc(CPacket* packet)
 {
-    if (packet->isEncoded) return;
-    
 	NET_HEADER* header = (NET_HEADER*)packet->GetBufferPtr();
 	header->staticCode = STATIC_CODE;
 	header->len = packet->GetDataSize() - sizeof(NET_HEADER);
@@ -181,8 +188,6 @@ BYTE CNetServer::MakeCheckSum(CPacket* packet)
 
 void CNetServer::Encode(CPacket* packet)
 {
-    if (packet->isEncoded) return;
-
     packet->isEncoded = true;
 
     NET_HEADER* header = (NET_HEADER*)packet->GetBufferPtr();
@@ -782,7 +787,7 @@ bool CNetServer::SendPost(SESSION* session)
     }
 
     session->sendCnt = min(SEND_PACKET_MAX, sendCnt);
-    ZeroMemory(pBuf, sizeof(WSABUF) * SEND_PACKET_MAX);
+    MEMORY_CLEAR(pBuf, WSABUFSIZE);
 
     InterlockedAdd64((__int64*)&totalSend, session->sendCnt);
 

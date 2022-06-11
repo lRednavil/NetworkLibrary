@@ -155,6 +155,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="Dump.h" />
     <ClInclude Include="ErrorReason.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="GameCommon.h" />
@@ -180,6 +181,7 @@
     <ClInclude Include="TLSMemoryPool.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Dump.cpp" />
     <ClCompile Include="GameServer.cpp" />
     <ClCompile Include="LanClient.cpp" />
     <ClCompile Include="LanCommon.cpp" />

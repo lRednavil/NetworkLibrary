@@ -18,10 +18,7 @@
 
 #pragma comment (lib, "WS2_32")
 
-#define CRASH() do{ \
-int *p = 0; \
-*p = 0;	\
-}while(0) \
+#include "Dump.h"
 
 #include "RingBuffer.h"
 #include "SerializedBuffer.h"
@@ -40,6 +37,10 @@ int *p = 0; \
 #include "ErrorReason.h"
 
 extern CTLSMemoryPool<CPacket> g_PacketPool;
+extern char ZeroField[4096];
+
+//maxSize 4096
+#define MEMORY_CLEAR(ptr, size) memmove_s(ptr, size, ZeroField, size);
 
 
 #endif //PCH_H

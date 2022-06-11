@@ -11,6 +11,7 @@
 #define STATIC_KEY 0x32
 
 #define SEND_PACKET_MAX 200
+constexpr int WSABUFSIZE = sizeof(WSABUF) * SEND_PACKET_MAX;
 
 class CMemoryPool;
 
