@@ -801,14 +801,15 @@ bool CNetServer::SendPost(SESSION* session)
 	}
 
 	sendQ = &session->sendQ;
-	sendCnt = min(SEND_PACKET_MAX, sendQ->GetSize());
+	sendCnt = sendQ->GetSize();
+	if (sendCnt > SEND_PACKET_MAX) sendCnt = SEND_PACKET_MAX;
 	
 	session->sendCnt = sendCnt;
 	MEMORY_CLEAR(pBuf, WSABUFSIZE);
 
 	InterlockedAdd64((__int64*)&totalSend, sendCnt);
 
-	for (cnt = 0; cnt < sendCnt; cnt++) {
+	for (cnt = 0; cnt < sendCnt; ++cnt) {
 		sendQ->Dequeue(&packet);
 		session->sendBuf[cnt] = packet;
 		pBuf[cnt].buf = packet->GetBufferPtr();

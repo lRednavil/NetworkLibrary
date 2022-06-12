@@ -64,16 +64,12 @@ inline CLockFreeQueue<DATA>::~CLockFreeQueue()
 template<class DATA>
 inline void CLockFreeQueue<DATA>::Enqueue(DATA val)
 {
-	QUEUE_NODE<DATA>* volatile node = NULL;
-	node = memPool.Alloc();
-
-	DWORD thread = GetCurrentThreadId();
+	QUEUE_NODE<DATA>* volatile node = memPool.Alloc();
 
 	node->val = val;
 	node->next = NULL;
 
 	node = (QUEUE_NODE<DATA>*)((__int64)node | ((__int64)InterlockedIncrement(&pushCnt) << 44));
-
 
 	for (;;) {
 		QUEUE_NODE<DATA>* volatile tail = tailNode;
@@ -122,7 +118,8 @@ inline bool CLockFreeQueue<DATA>::Dequeue(DATA* val)
 		}
 
 		if (InterlockedCompareExchange64((long long*)&headNode, (long long)next, (long long)head) == (long long)head) {
-			*val = nextVal->val;
+			//*val = nextVal->val;
+			memmove(val, &nextVal->val, sizeof(DATA));
 			memPool.Free(headVal);
 			return true;
 		}

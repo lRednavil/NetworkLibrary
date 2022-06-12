@@ -59,12 +59,11 @@ inline CLockFreeStack<DATA>::~CLockFreeStack()
 template<class DATA>
 inline void CLockFreeStack<DATA>::Push(DATA val)
 {
-	STACK_NODE<DATA>* volatile node = NULL;
+	STACK_NODE<DATA>* volatile node = memPool.Alloc();
 	STACK_NODE<DATA>* volatile nodeVal;
-	node = memPool.Alloc();
-	node->val = val;
-
 	STACK_NODE<DATA>* volatile t;
+
+	node->val = val;
 
 	nodeVal = node;
 	node = (STACK_NODE<DATA>*)((__int64)node | ((__int64)InterlockedIncrement(&pushCnt) << 44));
@@ -100,7 +99,8 @@ inline bool CLockFreeStack<DATA>::Pop(DATA* val)
 		}
 	}
 
-	*val = tVal->val;
+	//*val = tVal->val;
+	memmove(val, &tVal->val, sizeof(DATA));
 	memPool.Free(tVal);
 
 	_InterlockedDecrement(&size);
