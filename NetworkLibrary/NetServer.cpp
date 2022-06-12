@@ -117,6 +117,26 @@ bool CNetServer::SendPacket(DWORD64 sessionID, CPacket* packet)
 	return true;
 }
 
+bool CNetServer::SendEnQ(DWORD64 sessionID, CPacket* packet)
+{
+	SESSION* session = AcquireSession(sessionID);
+
+	if (session == NULL) {
+		PacketFree(packet);
+		return false;
+	}
+
+	if (packet->isEncoded == false) {
+		HeaderAlloc(packet);
+		Encode(packet);
+	}
+
+	session->sendQ.Enqueue(packet);
+	LoseSession(session);
+
+	return true;
+}
+
 bool CNetServer::SendAndDisconnect(DWORD64 sessionID, CPacket* packet)
 {
 	SESSION* session = AcquireSession(sessionID);
