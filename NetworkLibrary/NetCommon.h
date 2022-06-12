@@ -27,12 +27,22 @@ struct SESSION {
 	alignas(64)
 	DWORD64 ioCnt;
 	alignas(64)
-	bool isSending;
-
+	short isSending;
+	//send 후 해제용
+	CPacket* sendBuf[SEND_PACKET_MAX];
+	//monitor
+	DWORD sendCnt; // << 보낸 메세지수 확보
+	
 	//네트워크 메세지용 버퍼들
 	alignas(64)
 	CRingBuffer recvQ;
+	alignas(64)
 	CLockFreeQueue<CPacket*> sendQ;
+	alignas(64)
+	SOCKET sock;
+
+	//readonly
+	alignas(64)
 	DWORD64 sessionID;
 
 	//timeOut용 변수들
@@ -41,18 +51,11 @@ struct SESSION {
 	bool isTimeOutReserved = false;
 	bool isDisconnectReserved = false;
 
-	//send 후 해제용
-	CPacket* sendBuf[SEND_PACKET_MAX];
-	//monitor
-	DWORD sendCnt; // << 보낸 메세지수 확보
-
-	//readonly
-	alignas(64)
-	SOCKET sock;
 	WCHAR IP[16];
 
 	SESSION() {
 		ioCnt = RELEASE_FLAG;
+		isSending = 0;
 	}
 };
 
