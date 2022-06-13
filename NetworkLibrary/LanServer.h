@@ -29,6 +29,8 @@ public:
 	virtual void OnError(int error, const WCHAR* msg) = 0;
 
 private:
+	virtual void Init() = 0;
+
 	bool NetInit(WCHAR* IP, DWORD port, bool isNagle);
 	bool ThreadInit(const DWORD createThreads, const DWORD runningThreads);
 
@@ -52,6 +54,8 @@ private:
 
 	static unsigned int __stdcall WorkProc(void* arg);
 	static unsigned int __stdcall AcceptProc(void* arg);
+	void _WorkProc();
+	void _AcceptProc();
 	void RecvProc(SESSION* session);
 	bool RecvPost(SESSION* session);
 	bool SendPost(SESSION* session);

@@ -11,6 +11,9 @@
 #define STATIC_KEY 0x32
 
 #define SEND_PACKET_MAX 200
+
+#pragma comment(lib, "Winmm")
+
 constexpr int WSABUFSIZE = sizeof(WSABUF) * SEND_PACKET_MAX;
 
 class CMemoryPool;
@@ -25,25 +28,25 @@ struct SESSION {
 	OVERLAPPEDEX sendOver;
 	//session refCnt의 역할
 	alignas(64)
-	DWORD64 ioCnt;
+		DWORD64 ioCnt;
 	alignas(64)
-	short isSending;
+		short isSending;
 	//send 후 해제용
 	CPacket* sendBuf[SEND_PACKET_MAX];
 	//monitor
 	DWORD sendCnt; // << 보낸 메세지수 확보
-	
+
 	//네트워크 메세지용 버퍼들
 	alignas(64)
-	CRingBuffer recvQ;
+		CRingBuffer recvQ;
 	alignas(64)
-	CLockFreeQueue<CPacket*> sendQ;
+		CLockFreeQueue<CPacket*> sendQ;
 	alignas(64)
-	SOCKET sock;
+		SOCKET sock;
 
 	//readonly
 	alignas(64)
-	DWORD64 sessionID;
+		DWORD64 sessionID;
 
 	//timeOut용 변수들
 	DWORD lastTime;

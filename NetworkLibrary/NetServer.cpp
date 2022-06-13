@@ -5,9 +5,6 @@
 
 //#define PROFILE_MODE
 #include "TimeTracker.h"
-
-#pragma comment(lib, "Winmm")
-
 bool CNetServer::Start(WCHAR* IP, DWORD port, DWORD createThreads, DWORD runningThreads, bool isNagle, DWORD maxConnect)
 {
 	if (NetInit(IP, port, isNagle) == false) {
@@ -283,6 +280,7 @@ bool CNetServer::NetInit(WCHAR* IP, DWORD port, bool isNagle)
 	listenSock = socket(AF_INET, SOCK_STREAM, NULL);
 	if (listenSock == INVALID_SOCKET) {
 		err = WSAGetLastError();
+		_FILE_LOG(LOG_LEVEL_ERROR, L"LibraryErrorLog", L"Listen Socket Error %d", err);
 		return false;
 	}
 	_LOG(LOG_LEVEL_SYSTEM, L"Server Socket Made");
@@ -336,6 +334,7 @@ bool CNetServer::NetInit(WCHAR* IP, DWORD port, bool isNagle)
 	}
 	_LOG(LOG_LEVEL_SYSTEM, L"Server Start Listen");
 
+	_FILE_LOG(LOG_LEVEL_SYSTEM, L"LibraryLog", L"Server Net Init");
 	return true;
 }
 
@@ -368,6 +367,7 @@ bool CNetServer::ThreadInit(const DWORD createThreads, const DWORD runningThread
 	}
 	_LOG(LOG_LEVEL_SYSTEM, L"NetServer Thread Created");
 
+	_FILE_LOG(LOG_LEVEL_SYSTEM, L"LibraryLog", L"Server Thread Init");
 	return true;
 }
 
@@ -564,7 +564,6 @@ void CNetServer::_WorkProc()
 			else
 			{
 				session->recvQ.MoveRear(bytes);
-				//추가 recv에 맞춘 acquire
 				RecvProc(session);
 			}
 		}
@@ -693,8 +692,13 @@ void CNetServer::RecvProc(SESSION* session)
 
 		//넷헤더 추출
 		recvQ->Peek((char*)&netHeader, sizeof(netHeader));
-		packet = PacketAlloc();
+		//길이 판별
+		if (sizeof(netHeader) + netHeader.len > len) {
+			break;
+		}
 
+		packet = PacketAlloc();
+		//공격 방어용도
 		if (netHeader.len > packet->GetBufferSize()) {
 			Disconnect(session->sessionID);
 			PacketFree(packet);
@@ -703,13 +707,6 @@ void CNetServer::RecvProc(SESSION* session)
 			LoseSession(session);
 			return;
 		}
-
-		//길이 판별
-		if (sizeof(netHeader) + netHeader.len > len) {
-			PacketFree(packet);
-			break;
-		}
-
 
 		InterlockedIncrement(&totalRecv);
 

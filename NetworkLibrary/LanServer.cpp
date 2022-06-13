@@ -2,13 +2,6 @@
 #include "LanServer.h"
 #include "LanCommon.h"
 
-#define ACCEPT_THREAD 1
-#define TIMER_THREAD 1
-
-#define SESSION_MASK 0x00000fffffffffff
-#define MASK_SHIFT 45
-#define RELEASE_FLAG 0x7000000000000000
-
 bool CLanServer::Start(WCHAR* IP, DWORD port, DWORD createThreads, DWORD runningThreads, bool isNagle, DWORD maxConnect)
 {
     if (NetInit(IP, port, isNagle) == false) {
@@ -51,7 +44,8 @@ bool CLanServer::Disconnect(DWORD64 sessionID)
         return false;
     }
 
-    CancelIoEx((HANDLE)session->sock, NULL);
+    CancelIoEx((HANDLE)InterlockedExchange64((__int64*)&session->sock, session->sock | RELEASE_FLAG), NULL);
+
     LoseSession(session);
     return true;
 }
@@ -67,7 +61,12 @@ bool CLanServer::SendPacket(DWORD64 sessionID, CPacket* packet)
 
     HeaderAlloc(packet);
     session->sendQ.Enqueue(packet);
-    SendPost(session);
+    if (session->isSending == 0) {
+        SendPost(session);
+    }
+    else {
+        LoseSession(session);
+    }
     return true;
 }
 
@@ -175,10 +174,10 @@ bool CLanServer::ThreadInit(const DWORD createThreads, const DWORD runningThread
     //add 1 for accept thread
     hThreads = new HANDLE[createThreads + ACCEPT_THREAD];
 
-    hThreads[0] = (HANDLE)_beginthreadex(NULL, 0, CLanServer::AcceptProc, this, NULL, NULL);
+    hThreads[0] = (HANDLE)_beginthreadex(NULL, 0, CLanServer::_AcceptProc, this, NULL, NULL);
 
     for (cnt = ACCEPT_THREAD; cnt < createThreads + ACCEPT_THREAD; cnt++) {
-        hThreads[cnt] = (HANDLE)_beginthreadex(NULL, 0, CLanServer::WorkProc, this, NULL, NULL);
+        hThreads[cnt] = (HANDLE)_beginthreadex(NULL, 0, CLanServer::_WorkProc, this, NULL, NULL);
     }
 
     for (cnt = 0; cnt <= createThreads; cnt++) {
@@ -239,6 +238,7 @@ bool CLanServer::MakeSession(WCHAR* IP, SOCKET sock, DWORD64* ID)
     HANDLE h;
 
     if (sessionStack.Pop(&sessionID_high) == false) {
+        _FILE_LOG(LOG_LEVEL_SYSTEM, L"LibraryLog", L"All Session is in Use");
         OnError(-1, L"All Session is in Use");
         return false;
     }
@@ -253,10 +253,14 @@ bool CLanServer::MakeSession(WCHAR* IP, SOCKET sock, DWORD64* ID)
     wmemmove_s(session->IP, 16, IP, 16);
     session->sessionID = *ID = sessionID;
 
-    ZeroMemory(&session->recvOver, sizeof(session->recvOver));
+    MEMORY_CLEAR(&session->recvOver, sizeof(session->recvOver));
     session->recvOver.type = 0;
-    ZeroMemory(&session->sendOver, sizeof(session->sendOver));
+    MEMORY_CLEAR(&session->sendOver, sizeof(session->sendOver));
     session->sendOver.type = 1;
+
+    //recv용 ioCount증가
+    InterlockedIncrement(&session->ioCnt);
+    InterlockedAnd64((__int64*)&session->ioCnt, ~RELEASE_FLAG);
 
     //iocp match
     h = CreateIoCompletionPort((HANDLE)session->sock, hIOCP, (ULONG_PTR)sessionID, 0);
@@ -265,10 +269,7 @@ bool CLanServer::MakeSession(WCHAR* IP, SOCKET sock, DWORD64* ID)
         return false;
     }
 
-    session->ioCnt &= ~RELEASE_FLAG;
     InterlockedIncrement(&sessionCnt);
-    //recv start
-    InterlockedIncrement(&session->ioCnt);
     return RecvPost(session);
 }
 
@@ -279,11 +280,10 @@ void CLanServer::ReleaseSession(SESSION* session)
         return;
     }
 
-    SOCKET sock = session->sock;
     int leftCnt;
     CPacket* packet;
     
-    closesocket(sock);
+    closesocket(session->sock & ~RELEASE_FLAG);
 
     OnClientLeave(session->sessionID);
 
@@ -294,19 +294,39 @@ void CLanServer::ReleaseSession(SESSION* session)
     }
 
     //sendBuffer에 남은 찌꺼기 제거
-    for (leftCnt = 0; leftCnt < session->sendCnt; ++leftCnt) {
-        packet = session->sendBuf[leftCnt];
-        PacketFree(packet);    
-    }
+    leftCnt = session->sendCnt;
     session->sendCnt = 0;
+    while (leftCnt) {
+        --leftCnt;
+        packet = session->sendBuf[leftCnt];
+        PacketFree(packet);
+    }
 
-    InterlockedExchange8((char*)&session->isSending, false);
+    session->recvQ.ClearBuffer();
+
+    session->isSending = 0;
     InterlockedDecrement(&sessionCnt);
 
     sessionStack.Push(session->sessionID >> MASK_SHIFT);
 }
 
 unsigned int __stdcall CLanServer::WorkProc(void* arg)
+{
+    CLanServer* server = (CLanServer*)arg;
+    server->_WorkProc();
+
+    return 0;
+}
+
+unsigned int __stdcall CLanServer::AcceptProc(void* arg)
+{
+    CLanServer* server = (CLanServer*)arg;
+    server->_AcceptProc();
+
+    return 0;
+}
+
+void CLanServer::_WorkProc()
 {
     int ret;
     int err;
@@ -317,20 +337,19 @@ unsigned int __stdcall CLanServer::WorkProc(void* arg)
     SESSION* session;
     OVERLAPPEDEX* overlap = NULL;
 
-    CLanServer* server = (CLanServer*)arg;
-
-    while(server->isServerOn) {
-        ret = GetQueuedCompletionStatus(server->hIOCP, &bytes, (PULONG_PTR)&sessionID, (LPOVERLAPPED*)&overlap, INFINITE);
+    while(isServerOn) {
+        ret = GetQueuedCompletionStatus(hIOCP, &bytes, (PULONG_PTR)&sessionID, (LPOVERLAPPED*)&overlap, INFINITE);
 
         //gqcs is false and overlap is NULL
         //case totally failed
         if (overlap == NULL) {
             err = WSAGetLastError();
-            server->OnError(err, L"GQCS return NULL ovelap");
+            _FILE_LOG(LOG_LEVEL_ERROR, L"LibraryLog", L"GQCS return NULL ovelap");
+            OnError(err, L"GQCS return NULL ovelap");
             continue;
         }
 
-        session = server->AcquireSession(sessionID);
+        session = FindSession(sessionID);
 
         if (session == NULL) {
             continue;
@@ -338,70 +357,79 @@ unsigned int __stdcall CLanServer::WorkProc(void* arg)
         //recvd
         if (overlap->type == 0) {
             if (ret == false || bytes == 0) {
-                server->Disconnect(sessionID);
+                LoseSession(session);
             }
             else
             {
                 session->recvQ.MoveRear(bytes);
-                //추가 recv에 맞춘 acquire
-                server->AcquireSession(sessionID);
-                server->RecvProc(session);
+                RecvProc(session);
             }
 
         }
         //sent
         if (overlap->type == 1) {
-            while (session->sendCnt) {
-                --session->sendCnt;
-                server->PacketFree(session->sendBuf[session->sendCnt]);
-            }
-            InterlockedExchange8((char*)&session->isSending, 0);
-            if (ret != false) {
-                //추가로 send에 맞춘 acquire
-                server->AcquireSession(sessionID);
-                server->SendPost(session);
-            }
-        }
-        //작업 완료에 대한 lose
-        server->LoseSession(session);
+            DWORD sendCnt = session->sendCnt;
+            CPacket** sendBuf = session->sendBuf;
+            session->sendCnt = 0;
 
-        //gqcs 후 session의 acquire에 대한 해제
-        server->LoseSession(session);
+            while (sendCnt) {
+                --sendCnt;
+                PacketFree(sendBuf[sendCnt]);
+            }
+
+            InterlockedDecrement16(&session->isSending);
+
+            if (ret != false) {
+                if (session->sendQ.GetSize() != 0) {
+                    //추가로 send에 맞춘 acquire
+                    AcquireSession(sessionID);
+                    SendPost(session);
+                }
+            }
+            //작업 완료에 대한 lose
+            LoseSession(session);
+        }
+
     }
 
-    return 0;
 }
 
-unsigned int __stdcall CLanServer::AcceptProc(void* arg)
+void CLanServer::_AcceptProc()
 {
     SOCKADDR_IN addr;
     SOCKET sock;
     WCHAR IP[16];
 
-    CLanServer* server = (CLanServer*)arg;
+    SESSION* session;
     DWORD64 sessionID;
 
-    while(server->isServerOn) {
-        sock = accept(server->listenSock, (sockaddr*)&addr, NULL);
-        ++server->totalAccept;
+    while(isServerOn) {
+        sock = accept(listenSock, (sockaddr*)&addr, NULL);
+        ++totalAccept;
         if (sock == INVALID_SOCKET) {
             continue;
         }
 
         InetNtop(AF_INET, &addr.sin_addr, IP, 16);
         
-        if (server->OnConnectionRequest(IP, ntohs(addr.sin_port)) == false) {
+        if (OnConnectionRequest(IP, ntohs(addr.sin_port)) == false) {
             continue;
         }
 
-        if (server->MakeSession(IP, sock, &sessionID) == false) {
+        if (MakeSession(IP, sock, &sessionID) == false) {
             continue;
         }
 
-        server->OnClientJoin(sessionID);
+        session = FindSession(sessionID);
+
+        if (OnClientJoin(sessionID) == false) {
+            LoseSession(session);
+            continue;
+        }
+
+        RecvPost(session);
     }
 
-    return 0;
 }
 
 void CLanServer::RecvProc(SESSION* session)
@@ -413,13 +441,9 @@ void CLanServer::RecvProc(SESSION* session)
     CPacket* packet;
 
     for (;;) {
-        packet = PacketAlloc();
-        
         len = recvQ->GetUsedSize();
         //길이 판별
         if (sizeof(lanHeader) > len) {
-            packet->SubRef(); 
-			g_PacketPool.Free(packet);
             break;
         }
 
@@ -428,10 +452,9 @@ void CLanServer::RecvProc(SESSION* session)
 
         //길이 판별
         if (sizeof(lanHeader) + lanHeader.len > len) {
-            packet->SubRef(); 
-			g_PacketPool.Free(packet);
             break;
         }
+        packet = PacketAlloc();
 
         //넷헤더 영역 지나가기
         recvQ->MoveFront(sizeof(lanHeader));
@@ -462,7 +485,7 @@ bool CLanServer::RecvPost(SESSION* session)
     pBuf[0] = { len, recvQ->GetRearBufferPtr() };
     pBuf[1] = { recvQ->GetFreeSize() - len, recvQ->GetBufferPtr() };
 
-    ret = WSARecv(session->sock, pBuf, 2, NULL, &flag, (LPWSAOVERLAPPED)&session->recvOver, NULL);
+    ret = WSARecv(InterlockedAdd64((__int64*)&session->sock, 0), pBuf, 2, NULL, &flag, (LPWSAOVERLAPPED)&session->recvOver, NULL);
 
     if (ret == SOCKET_ERROR) {
         err = WSAGetLastError();
@@ -505,25 +528,20 @@ bool CLanServer::SendPost(SESSION* session)
     CLockFreeQueue<CPacket*>* sendQ;
     CPacket* packet;
 
-    WSABUF pBuf[200];
+    WSABUF pBuf[SEND_PACKET_MAX];
     
     //다른 SendPost진행중인지 확인용
-    if (InterlockedExchange8((char*)&session->isSending, 1) == true) {
+    if (InterlockedIncrement16(&session->isSending) != 1) {
         LoseSession(session);
         return false;
     }
 
     sendQ = &session->sendQ;
     sendCnt = sendQ->GetSize();
-    //0byte send시 iocp에 결과만 Enqueue, 실제 0바이트 송신 X
-    if (sendCnt == 0) {
-        InterlockedExchange8((char*)&session->isSending, 0);
-        LoseSession(session);
-        return false;
-    }
-    
-    session->sendCnt = min(200,sendCnt);
-    ZeroMemory(pBuf, sizeof(WSABUF) * 200);
+    if (sendCnt > SEND_PACKET_MAX) sendCnt = SEND_PACKET_MAX;
+
+    session->sendCnt = sendCnt;
+    MEMORY_CLEAR(pBuf, WSABUFSIZE);
 
     for (cnt = 0; cnt < sendCnt; cnt++) {
         sendQ->Dequeue(&packet);
@@ -532,7 +550,7 @@ bool CLanServer::SendPost(SESSION* session)
         pBuf[cnt].len = packet->GetDataSize();
     }
 
-    ret = WSASend(session->sock, pBuf, 200, NULL, 0, (LPWSAOVERLAPPED)&session->sendOver, NULL);
+    ret = WSASend(InterlockedAdd64((__int64*)&session->sock, 0), pBuf, 200, NULL, 0, (LPWSAOVERLAPPED)&session->sendOver, NULL);
 
     if (ret == SOCKET_ERROR) {
         err = WSAGetLastError();
