@@ -31,16 +31,12 @@
 #include "LockFreeStack.h"
 #include "TLSMemoryPool.h"
 
+#include "LibraryCommon.h"
+
 #include "ProcessMonitor.h"
 #include "ProcessorMonitor.h"
 
 #include "ErrorReason.h"
-
-extern CTLSMemoryPool<CPacket> g_PacketPool;
-extern char ZeroField[4096];
-
-//maxSize 4096
-#define MEMORY_CLEAR(ptr, size) memmove_s(ptr, size, ZeroField, size);
 
 
 #endif //PCH_H

@@ -18,6 +18,12 @@ constexpr int WSABUFSIZE = sizeof(WSABUF) * SEND_PACKET_MAX;
 
 class CMemoryPool;
 
+enum OVERLAP_ENUM {
+	OV_RECV = 0,
+	OV_SEND = 1,
+	OV_DISCONNECT = 2,
+	OV_SERVEREND = 0xff,
+};
 struct OVERLAPPEDEX {
 	OVERLAPPED overlap;
 	WORD type;

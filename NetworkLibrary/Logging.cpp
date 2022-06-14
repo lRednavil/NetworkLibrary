@@ -53,30 +53,3 @@ void FileLog(const WCHAR* fileName, int loglevel, const WCHAR* fmt, ...) {
 
 	fclose(fp);
 }
-
-void FileLog(WCHAR* fileName, int loglevel, const WCHAR* fmt, ...) {
-	WCHAR name[256];
-	DWORD threadId = GetCurrentThreadId();
-	FILE* fp;
-
-	WCHAR logBuf[1024];
-
-	_wmkdir(L"LOG");
-
-	va_list ap;
-	va_start(ap, fmt);
-	
-	vswprintf_s(logBuf, fmt, ap);
-
-	va_end(ap);
-
-	swprintf_s(name, L"%s%s_%u.txt", fileName, fileTime, threadId);
-
-	_wfopen_s(&fp, name, L"at");
-	if (fp == NULL) return;
-
-	fwprintf_s(fp, logBuf);
-	fwprintf_s(fp, L"\n");
-
-	fclose(fp);
-}

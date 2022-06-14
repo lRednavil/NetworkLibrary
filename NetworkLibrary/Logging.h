@@ -16,7 +16,6 @@ extern DWORD g_fileLogCnt;
 void LogInit();
 
 void FileLog(const WCHAR* fileName, int loglevel, const WCHAR* fmt, ...);
-void FileLog(WCHAR* fileName, int loglevel, const WCHAR* fmt, ...);
 
 inline void Log(WCHAR* str, int logLevel) {
     wprintf(L"%s \n", str);

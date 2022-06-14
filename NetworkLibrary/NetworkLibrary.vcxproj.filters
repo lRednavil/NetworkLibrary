@@ -111,6 +111,9 @@
     <ClInclude Include="Dump.h">
       <Filter>헤더 파일\Dump&amp;Log</Filter>
     </ClInclude>
+    <ClInclude Include="LibraryCommon.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="NetworkLibrary.cpp">
@@ -172,6 +175,9 @@
     </ClCompile>
     <ClCompile Include="Dump.cpp">
       <Filter>소스 파일\Dump&amp;Log</Filter>
+    </ClCompile>
+    <ClCompile Include="LibraryCommon.cpp">
+      <Filter>소스 파일</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

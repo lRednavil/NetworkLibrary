@@ -7,6 +7,10 @@
 #include "TimeTracker.h"
 bool CNetServer::Start(WCHAR* IP, DWORD port, DWORD createThreads, DWORD runningThreads, bool isNagle, DWORD maxConnect)
 {
+	if (isServerOn) {
+		return false;
+	}
+
 	if (NetInit(IP, port, isNagle) == false) {
 		return false;
 	}
@@ -36,7 +40,13 @@ bool CNetServer::Start(WCHAR* IP, DWORD port, DWORD createThreads, DWORD running
 
 void CNetServer::Stop()
 {
+	OnStop();
+
 	isServerOn = false;
+
+	NetClose();
+
+	ThreadClose();
 }
 
 int CNetServer::GetSessionCount()
@@ -350,16 +360,17 @@ bool CNetServer::ThreadInit(const DWORD createThreads, const DWORD runningThread
 	_LOG(LOG_LEVEL_SYSTEM, L"NetServer IOCP Created");
 
 	//add 1 for accept thread
-	hThreads = new HANDLE[createThreads + ACCEPT_THREAD + TIMER_THREAD];
+	threadCnt = createThreads + ACCEPT_THREAD + TIMER_THREAD;
+	hThreads = new HANDLE[threadCnt];
 
 	hThreads[0] = (HANDLE)_beginthreadex(NULL, 0, CNetServer::AcceptProc, this, NULL, NULL);
 	hThreads[1] = (HANDLE)_beginthreadex(NULL, 0, CNetServer::TimerProc, this, NULL, NULL);
 
-	for (cnt = ACCEPT_THREAD + TIMER_THREAD; cnt < createThreads + ACCEPT_THREAD + TIMER_THREAD; cnt++) {
+	for (cnt = ACCEPT_THREAD + TIMER_THREAD; cnt < threadCnt; cnt++) {
 		hThreads[cnt] = (HANDLE)_beginthreadex(NULL, 0, CNetServer::WorkProc, this, NULL, NULL);
 	}
 
-	for (cnt = 0; cnt < createThreads + ACCEPT_THREAD + TIMER_THREAD; cnt++) {
+	for (cnt = 0; cnt < threadCnt; cnt++) {
 		if (hThreads[cnt] == INVALID_HANDLE_VALUE) {
 			OnError(-1, L"Create Thread Failed");
 			return false;
@@ -369,6 +380,29 @@ bool CNetServer::ThreadInit(const DWORD createThreads, const DWORD runningThread
 
 	_FILE_LOG(LOG_LEVEL_SYSTEM, L"LibraryLog", L"Server Thread Init");
 	return true;
+}
+
+void CNetServer::NetClose()
+{
+	WSACleanup();
+
+	closesocket(listenSock);
+
+	//세션 정리
+	//for (DWORD cnt = 0; cnt < maxConnection; cnt++) {
+	//	int leftCnt;
+	//	CPacket* packet;
+
+	//	
+	//}
+
+	//CloseHandle(hIOCP);
+}
+
+void CNetServer::ThreadClose()
+{
+	isServerOn = false;
+	WaitForMultipleObjects(threadCnt, hThreads, TRUE, INFINITE);
 }
 
 SESSION* CNetServer::AcquireSession(DWORD64 sessionID)
@@ -645,7 +679,7 @@ void CNetServer::_AcceptProc()
 void CNetServer::_TimerProc()
 {
 	SESSION* session;
-	int cnt;
+	DWORD cnt;
 	//초기오류 방지구간
 	currentTime = timeGetTime();
 	Sleep(1000);

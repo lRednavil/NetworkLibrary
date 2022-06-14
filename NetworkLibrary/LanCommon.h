@@ -19,6 +19,17 @@ struct OVERLAPPEDEX {
 	WORD type;
 };
 
+
+struct CLIENT {
+	bool isAlive;
+	bool isConnected;
+	WCHAR connectionName[32];
+	WCHAR connectIP[16];
+	DWORD connectPort;
+	SOCKET sock;
+};
+
+
 struct SESSION {
 	OVERLAPPEDEX recvOver;
 	OVERLAPPEDEX sendOver;

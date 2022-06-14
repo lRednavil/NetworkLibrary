@@ -14,7 +14,7 @@ bool CLanServer::Start(WCHAR* IP, DWORD port, DWORD createThreads, DWORD running
     totalAccept = 0;
     sessionCnt = 0;
    
-    for (int cnt = 0; cnt < maxConnect; cnt++) {
+    for (DWORD cnt = 0; cnt < maxConnect; cnt++) {
         sessionStack.Push(cnt);
     }
 
@@ -162,7 +162,7 @@ bool CLanServer::NetInit(WCHAR* IP, DWORD port, bool isNagle)
 
 bool CLanServer::ThreadInit(const DWORD createThreads, const DWORD runningThreads)
 {
-    int cnt;
+    DWORD cnt;
     
     hIOCP = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, NULL, runningThreads);
 
@@ -174,10 +174,10 @@ bool CLanServer::ThreadInit(const DWORD createThreads, const DWORD runningThread
     //add 1 for accept thread
     hThreads = new HANDLE[createThreads + ACCEPT_THREAD];
 
-    hThreads[0] = (HANDLE)_beginthreadex(NULL, 0, CLanServer::_AcceptProc, this, NULL, NULL);
+    hThreads[0] = (HANDLE)_beginthreadex(NULL, 0, CLanServer::AcceptProc, this, NULL, NULL);
 
     for (cnt = ACCEPT_THREAD; cnt < createThreads + ACCEPT_THREAD; cnt++) {
-        hThreads[cnt] = (HANDLE)_beginthreadex(NULL, 0, CLanServer::_WorkProc, this, NULL, NULL);
+        hThreads[cnt] = (HANDLE)_beginthreadex(NULL, 0, CLanServer::WorkProc, this, NULL, NULL);
     }
 
     for (cnt = 0; cnt <= createThreads; cnt++) {

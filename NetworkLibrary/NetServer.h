@@ -11,6 +11,7 @@ public:
 	//오픈 IP / 포트 / 워커스레드 수(생성수, 러닝수) / 나글옵션 / 최대접속자 수
 	bool Start(WCHAR* IP, DWORD port, DWORD createThreads, DWORD runningThreads, bool isNagle, DWORD maxConnect);
 	void Stop();
+
 	int GetSessionCount();
 	//모니터링용 함수
 	void Monitor();
@@ -28,6 +29,8 @@ public:
 
 	void SetTimeOut(DWORD64 sessionID, DWORD timeVal, bool recvTimeReset = false);
 
+	//시동함수 작성용
+	virtual void Init() = 0;
 	//accept 직후, IP filterinig 등의 목적
 	virtual bool OnConnectionRequest(WCHAR* IP, DWORD Port) = 0;
 	//return false; 시 클라이언트 거부.
@@ -44,6 +47,9 @@ public:
 	virtual void OnError(int error, const WCHAR* msg) = 0;
 
 private:
+	//종료함수 작성용
+	virtual void OnStop() = 0;
+
 	bool NetInit(WCHAR* IP, DWORD port, bool isNagle);
 	bool ThreadInit(const DWORD createThreads, const DWORD runningThreads);
 
@@ -77,6 +83,7 @@ private:
 	void _WorkProc();
 	void _AcceptProc();
 	void _TimerProc();
+
 	void RecvProc(SESSION* session);
 	bool RecvPost(SESSION* session);
 	bool SendPost(SESSION* session);
@@ -118,6 +125,7 @@ private:
 	//readonly
 	SOCKET listenSock;
 	HANDLE hIOCP;
+	int threadCnt;
 
 	HANDLE* hThreads;
 };

@@ -16,6 +16,9 @@ public:
 	//기본 참조카운트 1부여 및 초기화 실행
 	CPacket* PacketAlloc();
 	void	PacketFree(CPacket* packet);
+
+	//시동함수 작성용
+	virtual void Init() = 0;
 	//accept 직후, IP filterinig 등의 목적
 	virtual bool OnConnectionRequest(WCHAR* IP, DWORD Port) = 0; 
 	//return false; 시 클라이언트 거부.
@@ -29,7 +32,8 @@ public:
 	virtual void OnError(int error, const WCHAR* msg) = 0;
 
 private:
-	virtual void Init() = 0;
+	//종료함수 작성용
+	virtual void OnStop() = 0;
 
 	bool NetInit(WCHAR* IP, DWORD port, bool isNagle);
 	bool ThreadInit(const DWORD createThreads, const DWORD runningThreads);
