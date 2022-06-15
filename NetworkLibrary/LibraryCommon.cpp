@@ -3,7 +3,7 @@
 #include "TLSMemoryPool.h"
 
 CTLSMemoryPool<CPacket> g_PacketPool;
-char ZeroField[4096] = {};
+char ZeroField[4096] = {0,};
 
 void MY_MEMORY_CLEAR(void* ptr, int size)
 {
@@ -16,7 +16,7 @@ void MY_MEMORY_CLEAR(void* ptr, int size)
 	int left = size % 4096;
 
 	for (int cnt = 0; cnt < lim; ++cnt) {
-		memmove_s(ptr, size, ZeroField, size);
+		memmove_s(ptr, 4096, ZeroField, 4096);
 		ptr = (char*)ptr + 4096;
 	}
 
