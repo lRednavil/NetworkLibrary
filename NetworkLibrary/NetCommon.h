@@ -15,6 +15,7 @@
 #pragma comment(lib, "Winmm")
 
 constexpr int WSABUFSIZE = sizeof(WSABUF) * SEND_PACKET_MAX;
+constexpr int TRANSBUFSIZE = sizeof(TRANSMIT_PACKETS_ELEMENT) * SEND_PACKET_MAX;
 
 class CMemoryPool;
 
@@ -32,6 +33,8 @@ struct OVERLAPPEDEX {
 struct SESSION {
 	OVERLAPPEDEX recvOver;
 	OVERLAPPEDEX sendOver;
+	LPFN_TRANSMITPACKETS transFn;
+	
 	//session refCntÀÇ ¿ªÇÒ
 	alignas(64)
 		DWORD64 ioCnt;

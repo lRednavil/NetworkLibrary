@@ -528,6 +528,7 @@ void CNetServer::ReleaseSession(SESSION* session)
 	InterlockedDecrement(&sessionCnt);
 
 	PostQueuedCompletionStatus(hIOCP, 0, session->sessionID, (LPOVERLAPPED)2);
+	
 }
 
 unsigned int __stdcall CNetServer::WorkProc(void* arg)
@@ -643,6 +644,9 @@ void CNetServer::_AcceptProc()
 	DWORD64 sessionID;
 	int addrLen = sizeof(addr);
 
+	GUID guidTrans = WSAID_TRANSMITPACKETS;
+	DWORD trash;
+
 	while (isServerOn) {
 		sock = accept(listenSock, (sockaddr*)&addr, &addrLen);
 		++totalAccept;
@@ -668,6 +672,8 @@ void CNetServer::_AcceptProc()
 			LoseSession(session);
 			continue;
 		}
+
+		WSAIoctl(sock, SIO_GET_EXTENSION_FUNCTION_POINTER, &guidTrans, sizeof(guidTrans), &session->transFn, sizeof(session->transFn), &trash, NULL, NULL);
 
 		InterlockedIncrement(&sessionCnt);
 
@@ -843,7 +849,8 @@ bool CNetServer::SendPost(SESSION* session)
 	CLockFreeQueue<CPacket*>* sendQ;
 	CPacket* packet;
 
-	WSABUF pBuf[SEND_PACKET_MAX];
+	//WSABUF pBuf[SEND_PACKET_MAX];
+	TRANSMIT_PACKETS_ELEMENT pBuf[SEND_PACKET_MAX];
 
 	//다른 SendPost진행중인지 확인용
 	if (InterlockedIncrement16(&session->isSending) != 1) {
@@ -856,20 +863,25 @@ bool CNetServer::SendPost(SESSION* session)
 	if (sendCnt > SEND_PACKET_MAX) sendCnt = SEND_PACKET_MAX;
 	
 	session->sendCnt = sendCnt;
-	MEMORY_CLEAR(pBuf, WSABUFSIZE);
+	//MEMORY_CLEAR(pBuf, WSABUFSIZE);
+	MEMORY_CLEAR(pBuf, TRANSBUFSIZE);
 
 	InterlockedAdd64((__int64*)&totalSend, sendCnt);
 
 	for (cnt = 0; cnt < sendCnt; ++cnt) {
 		sendQ->Dequeue(&packet);
 		session->sendBuf[cnt] = packet;
-		pBuf[cnt].buf = packet->GetBufferPtr();
-		pBuf[cnt].len = packet->GetDataSize();
+		pBuf[cnt].dwElFlags = TP_ELEMENT_MEMORY;
+		pBuf[cnt].cLength = packet->GetDataSize();
+		pBuf[cnt].pBuffer = packet->GetBufferPtr();
+		//pBuf[cnt].buf = packet->GetBufferPtr();
+		//pBuf[cnt].len = packet->GetDataSize();
 	}
 
-	ret = WSASend(InterlockedAdd64((__int64*)&session->sock, 0), pBuf, sendCnt, NULL, 0, (LPWSAOVERLAPPED)&session->sendOver, NULL);
+	//ret = WSASend(InterlockedAdd64((__int64*)&session->sock, 0), pBuf, sendCnt, NULL, 0, (LPWSAOVERLAPPED)&session->sendOver, NULL);
+	ret = session->transFn(InterlockedAdd64((__int64*)&session->sock, 0), pBuf, sendCnt, 0, (LPWSAOVERLAPPED)&session->sendOver, TF_WRITE_BEHIND);
 
-	if (ret == SOCKET_ERROR) {
+	if (ret == 0) {
 		err = WSAGetLastError();
 
 		if (err == WSA_IO_PENDING) {
