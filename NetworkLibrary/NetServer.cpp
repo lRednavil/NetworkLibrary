@@ -879,12 +879,12 @@ bool CNetServer::SendPost(SESSION* session)
 	}
 
 	//ret = WSASend(InterlockedAdd64((__int64*)&session->sock, 0), pBuf, sendCnt, NULL, 0, (LPWSAOVERLAPPED)&session->sendOver, NULL);
-	ret = session->transFn(InterlockedAdd64((__int64*)&session->sock, 0), pBuf, sendCnt, 0, (LPWSAOVERLAPPED)&session->sendOver, TF_WRITE_BEHIND);
+	ret = session->transFn(InterlockedAdd64((__int64*)&session->sock, 0), pBuf, sendCnt, 0, (LPWSAOVERLAPPED)&session->sendOver, TF_USE_DEFAULT_WORKER | TF_WRITE_BEHIND);
 
 	if (ret == 0) {
 		err = WSAGetLastError();
 
-		if (err == WSA_IO_PENDING) {
+		if (err == WSA_IO_PENDING || err == 0) {
 			//good
 		}
 		else {

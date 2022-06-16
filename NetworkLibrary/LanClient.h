@@ -11,7 +11,7 @@ public:
 	bool Connect(const WCHAR* connectName, const WCHAR* IP, const DWORD port);
 	bool Disconnect(const WCHAR* connectName);
 	
-	bool SendPacket(CPacket* packet);
+	bool SendPacket(const WCHAR* connectName, CPacket* packet);
 
 	//기본 참조카운트 1부여 및 초기화 실행
 	CPacket* PacketAlloc();
@@ -36,14 +36,9 @@ private:
 
 	//packet에 header 할당
 	void	HeaderAlloc(CPacket* packet);
-
-	//return NULL for fail
-	//FindSession + Check Flag + Session 재확인
-	//반드시 LoseSession과 페어를 맞출 것
-	SESSION* AcquireSession(DWORD64 sessionID);
-	//ioCnt 차감 이후 Release 세션 진입
-	//반드시 AcquireSession 이나 ioCnt 증가 후에 사용
-	void LoseSession(SESSION* session);
+	
+	void	ReConnect(int idx);
+	void	Disconnect(int idx);
 
 	SESSION* FindSession(DWORD64 sessionID);
 	bool	MakeSession(WCHAR* IP, SOCKET sock, DWORD64* ID);
@@ -52,9 +47,9 @@ private:
 	static unsigned int __stdcall WorkProc(void* arg);
 	void _WorkProc();
 
-	void RecvProc(SESSION* session);
-	bool RecvPost(SESSION* session);
-	bool SendPost(SESSION* session);
+	void RecvProc(int idx);
+	bool RecvPost(int idx);
+	bool SendPost(int idx);
 
 private:
 	enum {
@@ -68,6 +63,7 @@ private:
 	bool isClientOn;
 	bool isNagle;
 
+	HANDLE workEvent;
 	HANDLE hThread;
 };
 

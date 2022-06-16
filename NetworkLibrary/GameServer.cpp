@@ -484,20 +484,21 @@ void CGameServer::Encode(CPacket* packet)
 
     GAME_PACKET_HEADER* header = (GAME_PACKET_HEADER*)packet->GetBufferPtr();
     BYTE* ptr = (BYTE*)&header->checkSum;
-    BYTE key = STATIC_KEY;
+    BYTE key = STATIC_KEY + 1;
     WORD len = header->len;
-    BYTE randKey = header->randomKey;
+    BYTE randKey = header->randomKey + 1;
 
     WORD cnt;
+    WORD cur;
 
-    ptr[0] ^= randKey + 1;
-    for (cnt = 1; cnt <= len; ++cnt) {
-        ptr[cnt] ^= ptr[cnt - 1] + randKey + cnt + 1;
+    ptr[0] ^= randKey;
+    for (cur = 0, cnt = 1; cnt <= len; ++cur, ++cnt) {
+        ptr[cnt] ^= ptr[cur] + randKey + cnt;
     }
 
-    ptr[0] ^= key + 1;
-    for (cnt = 1; cnt <= len; ++cnt) {
-        ptr[cnt] ^= ptr[cnt - 1] + key + cnt + 1;
+    ptr[0] ^= key;
+    for (cur = 0, cnt = 1; cnt <= len; ++cur, ++cnt) {
+        ptr[cnt] ^= ptr[cur] + key + cnt;
     }
 }
 
@@ -505,21 +506,21 @@ void CGameServer::Decode(CPacket* packet)
 {
     GAME_PACKET_HEADER* header = (GAME_PACKET_HEADER*)packet->GetBufferPtr();
     BYTE* ptr = (BYTE*)&header->checkSum;
-    BYTE key = STATIC_KEY;
+    BYTE key = STATIC_KEY + 1;
     WORD len = header->len;
-    BYTE randKey = header->randomKey;
+    BYTE randKey = header->randomKey + 1;
 
     WORD cnt;
 
     for (cnt = len; cnt > 0; --cnt) {
-        ptr[cnt] ^= ptr[cnt - 1] + key + cnt + 1;
+        ptr[cnt] ^= ptr[cnt - 1] + key + cnt;
     }
-    ptr[0] ^= key + 1;
+    ptr[0] ^= key;
 
     for (cnt = len; cnt > 0; --cnt) {
-        ptr[cnt] ^= ptr[cnt - 1] + randKey + cnt + 1;
+        ptr[cnt] ^= ptr[cnt - 1] + randKey + cnt;
     }
-    ptr[0] ^= randKey + 1;
+    ptr[0] ^= randKey;
 }
 
 SESSION* CGameServer::AcquireSession(DWORD64 sessionID)
@@ -848,8 +849,8 @@ unsigned int __stdcall CGameServer::UnitProc(void* arg)
 
 void CGameServer::RecvProc(SESSION* session)
 {
-	//Packet 떼기 (netHeader 제거)
-	GAME_PACKET_HEADER netHeader;
+	//Packet 떼기 (packetHeader 제거)
+	GAME_PACKET_HEADER packetHeader;
 	GAME_PACKET_HEADER* header;
 	DWORD len;
 	CRingBuffer* recvQ = &session->recvQ;
@@ -862,15 +863,15 @@ void CGameServer::RecvProc(SESSION* session)
 	for (;;) {
 		len = recvQ->GetUsedSize();
 		//길이 판별
-		if (sizeof(netHeader) > len) {
+		if (sizeof(packetHeader) > len) {
 			break;
 		}
 
 		//넷헤더 추출
-		recvQ->Peek((char*)&netHeader, sizeof(netHeader));
+		recvQ->Peek((char*)&packetHeader, sizeof(packetHeader));
 		packet = PacketAlloc();
 
-		if (netHeader.len > packet->GetBufferSize()) {
+		if (packetHeader.len > packet->GetBufferSize()) {
 			Disconnect(session->sessionID);
 			PacketFree(packet);
 			_FILE_LOG(LOG_LEVEL_ERROR, L"LibraryLog", L"Unacceptable Length from %s", session->IP);
@@ -880,7 +881,7 @@ void CGameServer::RecvProc(SESSION* session)
 		}
 
 		//길이 판별
-		if (sizeof(netHeader) + netHeader.len > len) {
+		if (sizeof(packetHeader) + packetHeader.len > len) {
 			PacketFree(packet);
 			break;
 		}
@@ -889,10 +890,10 @@ void CGameServer::RecvProc(SESSION* session)
 		InterlockedIncrement(&totalRecv);
 
 		//헤더영역 dequeue
-		recvQ->Dequeue((char*)packet->GetBufferPtr(), sizeof(netHeader) + netHeader.len);
-		packet->MoveWritePos(netHeader.len);
+		recvQ->Dequeue((char*)packet->GetBufferPtr(), sizeof(packetHeader) + packetHeader.len);
+		packet->MoveWritePos(packetHeader.len);
 
-		if (netHeader.staticCode != STATIC_CODE) {
+		if (packetHeader.staticCode != STATIC_CODE) {
 			PacketFree(packet);
 			swprintf_s(errText, L"%s %s", L"Packet Code Error", session->IP);
 			_FILE_LOG(LOG_LEVEL_ERROR, L"LibraryLog", L"Packet Code Error from %s", session->IP);
@@ -917,7 +918,7 @@ void CGameServer::RecvProc(SESSION* session)
 			return;
 		}
 		//사용전 net헤더 스킵
-		packet->MoveReadPos(sizeof(netHeader));
+		packet->MoveReadPos(sizeof(packetHeader));
 
         session->belongClass->OnRecv(session->sessionID, packet);
 	}
@@ -1180,12 +1181,19 @@ bool CGameServer::SendPacket(DWORD64 sessionID, CPacket* packet)
 
 CPacket* CGameServer::PacketAlloc()
 {
-    return g_PacketPool.Alloc();
+    CPacket* packet = g_PacketPool.Alloc();
+    packet->AddRef(1);
+    packet->Clear();
+    packet->MoveWritePos(sizeof(GAME_PACKET_HEADER));
+    packet->isEncoded = false;
+    return packet;
 }
 
 void CGameServer::PacketFree(CPacket* packet)
 {
-    g_PacketPool.Free(packet);
+    if (packet->SubRef() == 0) {
+        g_PacketPool.Free(packet);
+    }
 }
 
 void CGameServer::SetTimeOut(DWORD64 sessionID, DWORD timeVal)
