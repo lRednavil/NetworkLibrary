@@ -2,6 +2,7 @@
 
 #define ACCEPT_THREAD 1
 #define TIMER_THREAD 1
+#define SEND_THREAD 1
 
 #define SESSION_MASK 0x00000fffffffffff
 #define MASK_SHIFT 45

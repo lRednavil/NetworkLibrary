@@ -81,12 +81,19 @@ bool CUnitClass::SendPacket(DWORD64 sessionID, CPacket* packet)
 
 CPacket* CUnitClass::PacketAlloc()
 {
-    return g_PacketPool.Alloc();
+    CPacket* packet = g_PacketPool.Alloc();
+    packet->AddRef(1);
+    packet->Clear();
+    packet->MoveWritePos(sizeof(GAME_PACKET_HEADER));
+    packet->isEncoded = false;
+    return packet;
 }
 
 void CUnitClass::PacketFree(CPacket* packet)
 {
-    g_PacketPool.Free(packet);
+    if (packet->SubRef() == 0) {
+        g_PacketPool.Free(packet);
+    }
 }
 
 void CUnitClass::SetTimeOut(DWORD64 sessionID, DWORD timeVal)
@@ -140,7 +147,7 @@ bool CGameServer::MoveClass(const WCHAR* tagName, DWORD64 sessionID, CPacket* pa
         tcb = &tcbArray[tcbIdx];
 
         //class index啊 瘤沥等 版快
-        if (classIdx != -1) {
+        if (classIdx != (WORD)-1) {
             if (InterlockedIncrement16((short*)&tcb->classList[classIdx]->currentUser) >= tcb->classList[classIdx]->maxUser) {
                 InterlockedDecrement16((short*)&tcb->classList[classIdx]->currentUser);
                 break;
@@ -325,7 +332,7 @@ void CGameServer::AttatchClass(const WCHAR* tagName, CUnitClass* const classPtr,
         if (wcscmp(tagName, tcbArray[cnt].tagName) != 0) 
             continue;
 
-        unitIdx = InterlockedIncrement16((short*)&tcbArray[cnt].currentUnits);
+        unitIdx = InterlockedIncrement16((short*)&tcbArray[cnt].currentUnits) - 1;
         if (unitIdx >= tcbArray[cnt].max_class_unit) {
             InterlockedDecrement16((short*)&tcbArray[cnt].currentUnits);
             continue;
@@ -337,7 +344,7 @@ void CGameServer::AttatchClass(const WCHAR* tagName, CUnitClass* const classPtr,
     }
 
     //货肺款 tcb狼 积己 苞沥
-    tcbIdx = InterlockedIncrement16((short*)&tcbCnt);
+    tcbIdx = InterlockedIncrement16((short*)&tcbCnt) - 1;
     wmemmove_s(tcbArray[tcbIdx].tagName, TAG_NAME_MAX, tagName, TAG_NAME_MAX);
     tcbArray[tcbIdx].max_class_unit = maxUnitCnt;
     tcbArray[tcbIdx].classList = new CUnitClass*[maxUnitCnt];
@@ -1083,7 +1090,7 @@ bool CGameServer::Start(WCHAR* IP, DWORD port, DWORD createThreads, DWORD runnin
     sessionCnt = 0;
     maxConnection = maxConnect;
 
-    tcbArray = new CUSTOM_TCB[500];
+    tcbArray = new CUSTOM_TCB[TCB_MAX];
     //default thread 积己
     TCB_TO_THREAD* arg = new TCB_TO_THREAD{ this, g_defaultTCB };
     _beginthreadex(NULL, 0, UnitProc, arg, 0, NULL);

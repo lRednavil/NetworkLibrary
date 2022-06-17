@@ -9,7 +9,7 @@ class CNetServer
 {
 public:
 	//오픈 IP / 포트 / 워커스레드 수(생성수, 러닝수) / 나글옵션 / 최대접속자 수
-	bool Start(WCHAR* IP, DWORD port, DWORD createThreads, DWORD runningThreads, bool isNagle, DWORD maxConnect);
+	bool Start(WCHAR* IP, DWORD port, DWORD createThreads, DWORD runningThreads, bool isNagle, DWORD maxConnect, DWORD snapLatency);
 	void Stop();
 
 	int GetSessionCount();
@@ -80,9 +80,11 @@ private:
 	static unsigned int __stdcall WorkProc(void* arg);
 	static unsigned int __stdcall AcceptProc(void* arg);
 	static unsigned int __stdcall TimerProc(void* arg);
+	static unsigned int __stdcall SendProc(void* arg);
 	void _WorkProc();
 	void _AcceptProc();
 	void _TimerProc();
+	void _SendProc();
 
 	void RecvProc(SESSION* session);
 	bool RecvPost(SESSION* session);
@@ -112,6 +114,7 @@ private:
 	SESSION* sessionArr;
 	//stack for session index
 	CLockFreeStack<int> sessionStack;
+	CLockFreeQueue<DWORD64> sendSessionQ;
 
 	//monitor
 	DWORD sessionCnt;
@@ -124,6 +127,7 @@ private:
 
 	//readonly
 	SOCKET listenSock;
+	DWORD snapLatency;
 	HANDLE hIOCP;
 	int threadCnt;
 

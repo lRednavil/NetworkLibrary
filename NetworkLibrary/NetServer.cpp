@@ -5,7 +5,7 @@
 
 //#define PROFILE_MODE
 #include "TimeTracker.h"
-bool CNetServer::Start(WCHAR* IP, DWORD port, DWORD createThreads, DWORD runningThreads, bool isNagle, DWORD maxConnect)
+bool CNetServer::Start(WCHAR* IP, DWORD port, DWORD createThreads, DWORD runningThreads, bool isNagle, DWORD maxConnect, DWORD snapLatency)
 {
 	if (isServerOn) {
 		return false;
@@ -21,6 +21,8 @@ bool CNetServer::Start(WCHAR* IP, DWORD port, DWORD createThreads, DWORD running
 	totalAccept = 0;
 	sessionCnt = 0;
 	maxConnection = maxConnect;
+	
+	this->snapLatency = snapLatency;
 
 	for (int cnt = 0; cnt < maxConnect; cnt++) {
 		sessionStack.Push(cnt);
@@ -114,13 +116,21 @@ bool CNetServer::SendPacket(DWORD64 sessionID, CPacket* packet)
 	}
 	session->sendQ.Enqueue(packet);
 
-	if (session->isSending == 0) {
-		SendPost(session);
+	//if (session->isSending == 0) {
+	//	SendPost(session);
+	//}
+	//else {
+	//	LoseSession(session);
+	//}
+
+	if (InterlockedIncrement16(&session->isSending) == 1) {
+		sendSessionQ.Enqueue(sessionID);
 	}
 	else {
-		LoseSession(session);
+		InterlockedDecrement16(&session->isSending);
 	}
 
+	LoseSession(session);
 	return true;
 }
 
@@ -360,13 +370,14 @@ bool CNetServer::ThreadInit(const DWORD createThreads, const DWORD runningThread
 	_LOG(LOG_LEVEL_SYSTEM, L"NetServer IOCP Created");
 
 	//add 1 for accept thread
-	threadCnt = createThreads + ACCEPT_THREAD + TIMER_THREAD;
+	threadCnt = createThreads + ACCEPT_THREAD + TIMER_THREAD + SEND_THREAD;
 	hThreads = new HANDLE[threadCnt];
 
 	hThreads[0] = (HANDLE)_beginthreadex(NULL, 0, CNetServer::AcceptProc, this, NULL, NULL);
 	hThreads[1] = (HANDLE)_beginthreadex(NULL, 0, CNetServer::TimerProc, this, NULL, NULL);
+	hThreads[2] = (HANDLE)_beginthreadex(NULL, 0, CNetServer::SendProc, this, NULL, NULL);
 
-	for (cnt = ACCEPT_THREAD + TIMER_THREAD; cnt < threadCnt; cnt++) {
+	for (cnt = ACCEPT_THREAD + TIMER_THREAD + SEND_THREAD; cnt < threadCnt; cnt++) {
 		hThreads[cnt] = (HANDLE)_beginthreadex(NULL, 0, CNetServer::WorkProc, this, NULL, NULL);
 	}
 
@@ -555,6 +566,14 @@ unsigned int __stdcall CNetServer::TimerProc(void* arg)
 	return 0;
 }
 
+unsigned int __stdcall CNetServer::SendProc(void* arg)
+{
+	CNetServer* server = (CNetServer*)arg;
+	server->_SendProc();
+
+	return 0;
+}
+
 void CNetServer::_WorkProc()
 {
 	int ret;
@@ -613,17 +632,25 @@ void CNetServer::_WorkProc()
 				PacketFree(sendBuf[sendCnt]);
 			}
 
-			InterlockedDecrement16(&session->isSending);
-			if (session->isDisconnectReserved) {
-				Disconnect(sessionID);
+			if (session->sendQ.GetSize() != 0) {
+				AcquireSession(sessionID);
+				SendPost(session);
 			}
-			else if (ret != false) {
-				if (session->sendQ.GetSize() != 0) {
-					//추가로 send에 맞춘 acquire
-					AcquireSession(sessionID);
-					SendPost(session);
-				}
+			else {
+				InterlockedDecrement16(&session->isSending);
 			}
+
+			//InterlockedDecrement16(&session->isSending);
+			//if (session->isDisconnectReserved) {
+			//	Disconnect(sessionID);
+			//}
+			//else if (ret != false) {
+			//	if (session->sendQ.GetSize() != 0) {
+			//		//추가로 send에 맞춘 acquire
+			//		AcquireSession(sessionID);
+			//		SendPost(session);
+			//	}
+			//}
 			//작업 완료에 대한 lose
 			LoseSession(session);
 		}
@@ -707,6 +734,27 @@ void CNetServer::_TimerProc()
 			}
 		}
 		Sleep(1000);
+	}
+}
+
+void CNetServer::_SendProc()
+{
+	int lim;
+	SESSION* session;
+	DWORD64 sessionID;
+	while (isServerOn) {
+		lim = sendSessionQ.GetSize();
+		while (lim) {
+			sendSessionQ.Dequeue(&sessionID);
+			session = AcquireSession(sessionID);
+			
+			if (session != NULL) {
+				SendPost(session);
+			}
+			--lim;
+		}
+
+		Sleep(snapLatency);
 	}
 }
 
@@ -852,11 +900,11 @@ bool CNetServer::SendPost(SESSION* session)
 	//WSABUF pBuf[SEND_PACKET_MAX];
 	TRANSMIT_PACKETS_ELEMENT pBuf[SEND_PACKET_MAX];
 
-	//다른 SendPost진행중인지 확인용
-	if (InterlockedIncrement16(&session->isSending) != 1) {
-		LoseSession(session);
-		return false;
-	}
+	////다른 SendPost진행중인지 확인용
+	//if (InterlockedIncrement16(&session->isSending) != 1) {
+	//	LoseSession(session);
+	//	return false;
+	//}
 
 	sendQ = &session->sendQ;
 	sendCnt = sendQ->GetSize();
