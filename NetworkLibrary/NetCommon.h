@@ -34,7 +34,6 @@ struct OVERLAPPEDEX {
 struct SESSION {
 	OVERLAPPEDEX recvOver;
 	OVERLAPPEDEX sendOver;
-	LPFN_TRANSMITPACKETS transFn;
 	
 	//session refCntÀÇ ¿ªÇÒ
 	alignas(64)

@@ -126,6 +126,7 @@ private:
 	CProcessorMonitor* totalMonitor;
 
 	//readonly
+	LPFN_TRANSMITPACKETS transFn;
 	SOCKET listenSock;
 	DWORD snapLatency;
 	HANDLE hIOCP;

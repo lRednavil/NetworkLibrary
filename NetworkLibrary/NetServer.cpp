@@ -700,7 +700,7 @@ void CNetServer::_AcceptProc()
 			continue;
 		}
 
-		WSAIoctl(sock, SIO_GET_EXTENSION_FUNCTION_POINTER, &guidTrans, sizeof(guidTrans), &session->transFn, sizeof(session->transFn), &trash, NULL, NULL);
+		WSAIoctl(sock, SIO_GET_EXTENSION_FUNCTION_POINTER, &guidTrans, sizeof(guidTrans), &transFn, sizeof(transFn), &trash, NULL, NULL);
 
 		InterlockedIncrement(&sessionCnt);
 
@@ -927,7 +927,7 @@ bool CNetServer::SendPost(SESSION* session)
 	}
 
 	//ret = WSASend(InterlockedAdd64((__int64*)&session->sock, 0), pBuf, sendCnt, NULL, 0, (LPWSAOVERLAPPED)&session->sendOver, NULL);
-	ret = session->transFn(InterlockedAdd64((__int64*)&session->sock, 0), pBuf, sendCnt, 0, (LPWSAOVERLAPPED)&session->sendOver, TF_USE_DEFAULT_WORKER | TF_WRITE_BEHIND);
+	ret = transFn(InterlockedAdd64((__int64*)&session->sock, 0), pBuf, sendCnt, 0, (LPWSAOVERLAPPED)&session->sendOver, TF_USE_DEFAULT_WORKER | TF_WRITE_BEHIND);
 
 	if (ret == 0) {
 		err = WSAGetLastError();
