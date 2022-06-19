@@ -5,4 +5,4 @@ extern char ZeroField[4096];
 
 void MY_MEMORY_CLEAR(void* ptr, int size);
 
-#define MEMORY_CLEAR(ptr, size) MY_MEMORY_CLEAR((void*)ptr, size)
+#define MEMORY_CLEAR(ptr, size) MY_MEMORY_CLEAR((void*)ptr, (size))

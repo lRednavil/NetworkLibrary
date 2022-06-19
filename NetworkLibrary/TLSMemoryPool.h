@@ -21,6 +21,8 @@ class CTLSMemoryPool : public LFMPBase
 public:
 	//미리 생성할 노드 개수, 생성자 사용 여부
 	CTLSMemoryPool(int chunkSize = 1000, bool newCall = false);
+	template <typename... params>
+	CTLSMemoryPool(int chunkSize, bool newCall, params... args);
 	virtual ~CTLSMemoryPool();
 
 	DATA* Alloc();
@@ -148,4 +150,17 @@ template<class DATA>
 inline int CTLSMemoryPool<DATA>::GetUseCount()
 {
 	return useCount;
+}
+
+template<class DATA>
+template<typename ...params>
+inline CTLSMemoryPool<DATA>::CTLSMemoryPool(int chunkSize, bool newCall, params... args)
+{
+	tlsID = TlsAlloc();
+
+	capacity = 0;
+	useCount = 0;
+	allocTry = 0;
+
+	chunkPool = new CLockFreeMemoryPool<CHUNK<DATA>>(0, newCall, args...);
 }

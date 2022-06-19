@@ -28,6 +28,8 @@ class CLockFreeMemoryPool : public LFMPBase
 public:
 	//미리 생성할 노드 개수, 생성자 사용 여부
 	CLockFreeMemoryPool(int initNodes = 0, bool newCall = false);
+	template <typename... params>
+	CLockFreeMemoryPool(int initNodes = 0, bool newCall = false, params... args);
 	virtual ~CLockFreeMemoryPool();
 
 	DATA* Alloc();
@@ -49,6 +51,7 @@ private:
 	alignas(64)
 	bool newCall;
 	int capacity;
+	void** dataParams;
 };
 
 template<class DATA>
@@ -185,5 +188,39 @@ inline int CLockFreeMemoryPool<DATA>::GetUseCount()
 	return useCount;
 }
 
+
+
+template<class DATA>
+template<typename ...params>
+inline CLockFreeMemoryPool<DATA>::CLockFreeMemoryPool(int initNodes, bool newCall, params ...args)
+{
+	topNode = NULL;
+
+	useCount = 0;
+	allocTry = 0;
+
+	//initnodes
+	POOLHEADER* nodeVal;
+	POOLHEADER* node;
+	POOLHEADER* top;
+
+	for (int cnt = 0; cnt < capacity; cnt++) {
+		nodeVal = PoolHeaderAlloc(sizeof(DATA));
+
+		//topnode를 위한 node 변형
+		node = (POOLHEADER*)((__int64)nodeVal | ((long long)_InterlockedIncrement((long*)&allocTry) << 44));
+
+		for (;;) {
+			top = topNode;
+
+			PoolHeaderSetNext(nodeVal, top);
+
+			if (_InterlockedCompareExchange64((__int64*)&topNode, (__int64)node, (__int64)top) == (__int64)top) {
+				break;
+			}
+		}
+	}
+
+}
 
 #undef POOLHEADERMASK

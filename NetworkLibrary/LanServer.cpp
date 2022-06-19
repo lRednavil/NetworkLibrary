@@ -2,7 +2,7 @@
 #include "LanServer.h"
 #include "LanCommon.h"
 
-bool CLanServer::Start(const WCHAR * IP, DWORD port, DWORD createThreads, DWORD runningThreads, bool isNagle, DWORD maxConnect)
+bool CLanServer::Start(const WCHAR * IP, DWORD port, DWORD createThreads, DWORD runningThreads, bool isNagle, DWORD maxConnect, DWORD packetSize)
 {
     if (NetInit(IP, port, isNagle) == false) {
         return false;
@@ -14,6 +14,13 @@ bool CLanServer::Start(const WCHAR * IP, DWORD port, DWORD createThreads, DWORD 
     totalAccept = 0;
     sessionCnt = 0;
    
+    if (packetSize == 1460) {
+        packetPool = &g_PacketPool;
+    }
+    else {
+        //packetPool = new CTLSMemoryPool<>;
+    }
+
     for (DWORD cnt = 0; cnt < maxConnect; cnt++) {
         sessionStack.Push(cnt);
     }
@@ -270,7 +277,7 @@ bool CLanServer::MakeSession(WCHAR* IP, SOCKET sock, DWORD64* ID)
     }
 
     InterlockedIncrement(&sessionCnt);
-    return RecvPost(session);
+    return true;
 }
 
 void CLanServer::ReleaseSession(SESSION* session)
@@ -456,10 +463,11 @@ void CLanServer::RecvProc(SESSION* session)
         }
         packet = PacketAlloc();
 
-        //넷헤더 영역 지나가기
-        recvQ->MoveFront(sizeof(lanHeader));
         //나중에 메세지 헤더 따라 처리 or MsgUpdate(session, packet)
-        recvQ->Dequeue((char*)packet->GetWritePtr(), lanHeader.len);
+        recvQ->Dequeue((char*)packet->GetBufferPtr(), sizeof(lanHeader) + lanHeader.len);
+        //헤더영역 안읽기
+        packet->MoveReadPos(sizeof(lanHeader));
+        //패킷 길이만큼 이동
         packet->MoveWritePos(lanHeader.len);
 
         OnRecv(session->sessionID, packet);

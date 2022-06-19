@@ -6,7 +6,7 @@ class CLanServer
 {
 public:
 	//오픈 IP / 포트 / 워커스레드 수(생성수, 러닝수) / 나글옵션 / 최대접속자 수
-	bool Start(const WCHAR * IP, DWORD port, DWORD createThreads, DWORD runningThreads, bool isNagle, DWORD maxConnect);
+	bool Start(const WCHAR * IP, DWORD port, DWORD createThreads, DWORD runningThreads, bool isNagle, DWORD maxConnect, DWORD packetSize = 1460);
 	void Stop();
 	int GetSessionCount();
 
@@ -31,9 +31,9 @@ public:
 
 	virtual void OnError(int error, const WCHAR* msg) = 0;
 
-private:
 	//종료함수 작성용
 	virtual void OnStop() = 0;
+private:
 
 	bool NetInit(const WCHAR * IP, DWORD port, bool isNagle);
 	bool ThreadInit(const DWORD createThreads, const DWORD runningThreads);
@@ -79,6 +79,7 @@ private:
 	bool isServerOn;
 
 	//readonly
+	CTLSMemoryPool<CPacket>* packetPool;
 	SOCKET listenSock;
 	HANDLE hIOCP;
 

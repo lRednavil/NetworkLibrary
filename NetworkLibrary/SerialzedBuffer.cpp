@@ -36,7 +36,7 @@ int CPacket::MoveWritePos(int size)
 
 int CPacket::MoveReadPos(int size)
 {
-    if (_head + size >= _rear) return -1;
+    if (_head + size > _rear) return -1;
 
     _head += size;
     return size;

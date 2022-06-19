@@ -22,7 +22,7 @@ public:
 	
 	//시동함수 작성용
 	virtual void Init() = 0;
-	//accept 직후, IP filterinig 등의 목적
+	//connect직후 호출
 	virtual bool OnConnect() = 0;
 	//message 분석 역할
 	virtual void OnRecv(CPacket* packet) = 0;

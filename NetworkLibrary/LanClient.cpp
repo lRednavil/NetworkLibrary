@@ -36,7 +36,7 @@ enum {
 class CMasterClient : public CLanClient {
     //시동함수 작성용
     virtual void Init() {};
-    //accept 직후, IP filterinig 등의 목적
+    //connect직후 호출
     virtual bool OnConnect() { return true; };
     //message 분석 역할
     virtual void OnRecv(CPacket* packet) {};
@@ -80,7 +80,7 @@ bool CLanClient::Start(bool _isNagle)
     isNagle = _isNagle;
 
     clientArr = new CLIENT*[CLIENT_MAX];
-    MEMORY_CLEAR(clientArr, sizeof(clientArr));
+    MEMORY_CLEAR(clientArr, sizeof(void*) * CLIENT_MAX);
 
     //make thread
     hThread = (HANDLE)_beginthreadex(NULL, 0, masterClient.WorkProc, &masterClient, 0, NULL);
@@ -119,6 +119,7 @@ void CLanClient::Connect(const WCHAR* connectName, const WCHAR* IP, const DWORD 
     CONNECT_JOB job;
     CLIENT* client = new CLIENT;
 
+    client->isConnected = false;
     wmemmove_s(client->connectionName, CLIENT::NAME_MAX, connectName, CLIENT::NAME_MAX);
     wmemmove_s(client->connectIP, 16, IP, 16);
     client->connectPort = port;
@@ -162,6 +163,7 @@ bool CLanClient::SendPacket(CPacket* packet)
 {
     if (myClient == NULL) return false;
 
+    HeaderAlloc(packet);
     myClient->sendQ.Enqueue(packet);
 
     return true;
@@ -218,7 +220,7 @@ bool CLanClient::_Connect(CLIENT* client)
     client->sock = socket(AF_INET, SOCK_STREAM, NULL);
     if (client->sock == INVALID_SOCKET) {
         _FILE_LOG(LOG_LEVEL_ERROR, L"LibraryLog", L"Socket Make Failed");
-        OnError(-1, L"Socket Make Failed");
+        client->belongClient->OnError(-1, L"Socket Make Failed");
     }
 
     //setsockopt
@@ -228,21 +230,21 @@ bool CLanClient::_Connect(CLIENT* client)
 
     ret = setsockopt(client->sock, SOL_SOCKET, SO_LINGER, (char*)&optval, sizeof(optval));
     if (ret == SOCKET_ERROR) {
-        OnError(WSAGetLastError(), L"socket Option Failed");
+        client->belongClient->OnError(WSAGetLastError(), L"socket Option Failed");
         return false;
     }
 
     u_long nonblock = 1;
     ret = ioctlsocket(client->sock, FIONBIO, &nonblock);
     if (ret == SOCKET_ERROR) {
-        OnError(WSAGetLastError(), L"socket Option Failed");
+        client->belongClient->OnError(WSAGetLastError(), L"socket Option Failed");
         return false;
     }
 
     if (isNagle == false) {
         ret = setsockopt(client->sock, IPPROTO_TCP, TCP_NODELAY, (char*)&isNagle, sizeof(isNagle));
         if (ret == SOCKET_ERROR) {
-            OnError(WSAGetLastError(), L"socket Option Failed");
+            client->belongClient->OnError(WSAGetLastError(), L"socket Option Failed");
             return false;
         }
     }
@@ -257,12 +259,12 @@ bool CLanClient::_Connect(CLIENT* client)
     if (ret == SOCKET_ERROR) {
         err = WSAGetLastError();
         if (err != WSAEWOULDBLOCK) {
-            OnError(WSAGetLastError(), L"Connect Failed");
+            client->belongClient->OnError(WSAGetLastError(), L"Connect Failed");
 			return false;
         }
     }
 
-    SetEvent(workEvent);
+    clientArr[clientIdx] = client;
     return true;
 }
 
@@ -302,7 +304,7 @@ void CLanClient::_WorkProc()
         ret = select(0, &readSet, &writeSet, &exptSet, NULL);
 
         if (ret == SOCKET_ERROR) {
-            OnError(WSAGetLastError(), L"Select Failed");
+            _LOG(LOG_LEVEL_SYSTEM, L"Select Failed. Code : %d", WSAGetLastError());
             continue;
         }
 
@@ -405,7 +407,7 @@ void CLanClient::RecvProc(CLIENT* client)
         //사용전 net헤더 스킵
         packet->MoveReadPos(sizeof(lanHeader));
 
-        OnRecv(packet);
+        destClient->OnRecv(packet);
     }
 }
 
@@ -444,16 +446,16 @@ bool CLanClient::SendPost(CLIENT* client)
         sendSize += len;
     }
 
-    ret = send(myClient->sock, sendBuf, sendSize, 0);
+    ret = send(client->sock, sendBuf, sendSize, 0);
     if (ret == SOCKET_ERROR) {
         err = WSAGetLastError();
         if (err != WSAEWOULDBLOCK) {
-            OnError(err, L"Send Failed");
+            client->belongClient->OnError(err, L"Send Failed");
             return false;
         }
     }
 
-    return false;
+    return true;
 }
 
 CPacket* CLanClient::PacketAlloc()
