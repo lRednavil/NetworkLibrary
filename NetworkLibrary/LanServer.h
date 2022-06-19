@@ -35,7 +35,7 @@ private:
 	//종료함수 작성용
 	virtual void OnStop() = 0;
 
-	bool NetInit(WCHAR* IP, DWORD port, bool isNagle);
+	bool NetInit(const WCHAR * IP, DWORD port, bool isNagle);
 	bool ThreadInit(const DWORD createThreads, const DWORD runningThreads);
 
 	void NetClose();

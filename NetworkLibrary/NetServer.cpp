@@ -288,7 +288,7 @@ void CNetServer::SetTimeOut(DWORD64 sessionID, DWORD timeVal, bool recvTimeReset
 	LoseSession(session);
 }
 
-bool CNetServer::NetInit(WCHAR* IP, DWORD port, bool isNagle)
+bool CNetServer::NetInit(const WCHAR* IP, DWORD port, bool isNagle)
 {
 	int ret;
 	int err;

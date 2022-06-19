@@ -92,7 +92,7 @@ void CLanServer::PacketFree(CPacket* packet)
     }
 }
 
-bool CLanServer::NetInit(WCHAR* IP, DWORD port, bool isNagle)
+bool CLanServer::NetInit(const WCHAR * IP, DWORD port, bool isNagle)
 {
     int ret;
     int err;
