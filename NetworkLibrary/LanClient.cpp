@@ -37,7 +37,7 @@ class CMasterClient : public CLanClient {
     //시동함수 작성용
     virtual void Init() {};
     //accept 직후, IP filterinig 등의 목적
-    virtual bool OnConnect() {};
+    virtual bool OnConnect() { return true; };
     //message 분석 역할
     virtual void OnRecv(CPacket* packet) {};
     //예외일 경우 선택(아마 높은확률로 disconnect)
