@@ -5,7 +5,7 @@
 
 //#define PROFILE_MODE
 #include "TimeTracker.h"
-bool CNetServer::Start(WCHAR* IP, DWORD port, DWORD createThreads, DWORD runningThreads, bool isNagle, DWORD maxConnect, DWORD snapLatency)
+bool CNetServer::Start(const WCHAR * IP, DWORD port, DWORD createThreads, DWORD runningThreads, bool isNagle, DWORD maxConnect, DWORD snapLatency)
 {
 	if (isServerOn) {
 		return false;
