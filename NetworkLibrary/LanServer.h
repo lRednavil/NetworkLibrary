@@ -80,6 +80,7 @@ private:
 
 	//readonly
 	CTLSMemoryPool<CPacket>* packetPool;
+	int packetSize;
 	SOCKET listenSock;
 	HANDLE hIOCP;
 

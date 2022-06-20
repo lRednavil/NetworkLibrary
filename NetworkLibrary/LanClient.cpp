@@ -282,6 +282,10 @@ void CLanClient::_WorkProc()
     fd_set writeSet;
     fd_set exptSet;
 
+    timeval tv;
+    tv.tv_sec = 0;
+    tv.tv_usec = 200;
+
     int cnt;
     int ret;
     WaitForSingleObject(workEvent, INFINITE);
@@ -301,7 +305,9 @@ void CLanClient::_WorkProc()
 			FD_SET(clientArr[cnt]->sock, &exptSet);
         }
         
-        ret = select(0, &readSet, &writeSet, &exptSet, NULL);
+        ret = select(0, &readSet, &writeSet, &exptSet, &tv);
+
+        if (ret == 0) continue;
 
         if (ret == SOCKET_ERROR) {
             _LOG(LOG_LEVEL_SYSTEM, L"Select Failed. Code : %d", WSAGetLastError());
@@ -408,6 +414,8 @@ void CLanClient::RecvProc(CLIENT* client)
         packet->MoveReadPos(sizeof(lanHeader));
 
         destClient->OnRecv(packet);
+
+
     }
 }
 
@@ -429,6 +437,7 @@ bool CLanClient::SendPost(CLIENT* client)
         packet->GetData(sendBuf + sendSize, len);
 
         sendSize += len;
+        PacketFree(client->savedPacket);
     }
 
     for(;;) {
@@ -444,6 +453,7 @@ bool CLanClient::SendPost(CLIENT* client)
         packet->GetData(sendBuf + sendSize, len);
 
         sendSize += len;
+        PacketFree(packet);
     }
 
     ret = send(client->sock, sendBuf, sendSize, 0);

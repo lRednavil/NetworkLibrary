@@ -114,9 +114,6 @@
     <ClInclude Include="LibraryCommon.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
-    <ClInclude Include="VariadicList.h">
-      <Filter>헤더 파일\Containers</Filter>
-    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="NetworkLibrary.cpp">

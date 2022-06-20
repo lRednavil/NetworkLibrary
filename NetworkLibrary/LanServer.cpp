@@ -13,12 +13,13 @@ bool CLanServer::Start(const WCHAR * IP, DWORD port, DWORD createThreads, DWORD 
 
     totalAccept = 0;
     sessionCnt = 0;
+    this->packetSize = packetSize;
    
     if (packetSize == 1460) {
         packetPool = &g_PacketPool;
     }
     else {
-        //packetPool = new CTLSMemoryPool<>;
+        packetPool = new CTLSMemoryPool<CPacket>;
     }
 
     for (DWORD cnt = 0; cnt < maxConnect; cnt++) {
@@ -79,7 +80,12 @@ bool CLanServer::SendPacket(DWORD64 sessionID, CPacket* packet)
 
 CPacket* CLanServer::PacketAlloc()
 {
-    CPacket* packet = g_PacketPool.Alloc();
+    CPacket* packet = packetPool->Alloc();
+    if (packet->GetBufferSize() != packetSize) {
+        packet->~CPacket();
+        new (packet)CPacket(packetSize);
+    }
+
     packet->AddRef(1);
     packet->Clear();
     packet->MoveWritePos(sizeof(LAN_HEADER));

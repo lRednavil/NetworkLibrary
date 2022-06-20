@@ -180,7 +180,6 @@
     <ClInclude Include="SerializedBuffer.h" />
     <ClInclude Include="TimeTracker.h" />
     <ClInclude Include="TLSMemoryPool.h" />
-    <ClInclude Include="VariadicList.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Dump.cpp" />
