@@ -1,5 +1,4 @@
 #pragma once
-struct SESSION;
 struct CLIENT;
 struct CONNECT_JOB;
 class CPacket;

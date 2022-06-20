@@ -46,9 +46,9 @@ public:
 
 	virtual void OnError(int error, const WCHAR* msg) = 0;
 
-private:
 	//종료함수 작성용
 	virtual void OnStop() = 0;
+private:
 
 	bool NetInit(const WCHAR * IP, DWORD port, bool isNagle);
 	bool ThreadInit(const DWORD createThreads, const DWORD runningThreads);

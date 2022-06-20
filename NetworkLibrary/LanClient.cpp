@@ -1,6 +1,6 @@
 #include "pch.h"
 #include "LanClient.h"
-#include "LanCommon.h"
+#include "LanCommon.h"  
 
 struct CLIENT {
     enum {
@@ -33,6 +33,7 @@ enum {
     CLIENT_MAX = 64,
 };
 
+//공통함수 작동용 더미 클라이언트 
 class CMasterClient : public CLanClient {
     //시동함수 작성용
     virtual void Init() {};
@@ -156,7 +157,7 @@ bool CLanClient::Disconnect()
 
     connectQ.Enqueue(job);
 
-    return false;
+    return true;
 }
 
 bool CLanClient::SendPacket(CPacket* packet)
