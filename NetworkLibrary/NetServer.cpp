@@ -5,7 +5,7 @@
 
 //#define PROFILE_MODE
 #include "TimeTracker.h"
-bool CNetServer::Start(const WCHAR * IP, DWORD port, DWORD createThreads, DWORD runningThreads, bool isNagle, DWORD maxConnect, DWORD snapLatency)
+bool CNetServer::Start(const WCHAR * IP, DWORD port, DWORD createThreads, DWORD runningThreads, bool isNagle, DWORD maxConnect, DWORD snapLatency, int packetSize)
 {
 	if (isServerOn) {
 		return false;
@@ -23,6 +23,14 @@ bool CNetServer::Start(const WCHAR * IP, DWORD port, DWORD createThreads, DWORD 
 	maxConnection = maxConnect;
 	
 	this->snapLatency = snapLatency;
+	this->packetSize = packetSize;
+
+	if (packetSize != CPacket::eBUFFER_DEFAULT) {
+		packetPool = &g_PacketPool;
+	}
+	else {
+		packetPool = new CTLSMemoryPool<CPacket>;
+	}
 
 	for (int cnt = 0; cnt < maxConnect; cnt++) {
 		sessionStack.Push(cnt);
@@ -192,7 +200,11 @@ bool CNetServer::SendAndDisconnect(DWORD64 sessionID, CPacket* packet, DWORD tim
 
 CPacket* CNetServer::PacketAlloc()
 {
-	CPacket* packet = g_PacketPool.Alloc();
+	CPacket* packet = packetPool->Alloc();
+	if (packet->GetBufferSize() != packetSize) {
+		packet->~CPacket();
+		new (packet)CPacket(packetSize);
+	}
 	packet->AddRef(1);
 	packet->Clear();
 	packet->MoveWritePos(sizeof(NET_HEADER));
@@ -271,7 +283,7 @@ void CNetServer::Decode(CPacket* packet)
 void CNetServer::PacketFree(CPacket* packet)
 {
 	if (packet->SubRef() == 0) {
-		g_PacketPool.Free(packet);
+		packetPool->Free(packet);
 	}
 }
 

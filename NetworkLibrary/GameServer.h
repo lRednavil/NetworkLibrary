@@ -25,7 +25,7 @@ public:
 	CUnitClass();
 	virtual ~CUnitClass();
 
-	void InitClass(WORD targetFrame, BYTE endOpt, WORD maxUser);
+	void InitClass(WORD targetFrame, BYTE endOpt, WORD maxUser, int packetSize = CPacket::eBUFFER_DEFAULT);
 	
 	//server참조 함수들
 	
@@ -80,6 +80,8 @@ private:
 	CLockFreeQueue<MOVE_INFO>* joinQ;
 	CLockFreeQueue<MOVE_INFO>* leaveQ;
 	WORD frameDelay; //1초 / targetFrame
+	CTLSMemoryPool<CPacket>* packetPool;
+	int packetSize;
 	BYTE endOption;
 	CGameServer* server = nullptr;
 };

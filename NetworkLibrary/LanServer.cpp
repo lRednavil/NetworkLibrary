@@ -15,7 +15,7 @@ bool CLanServer::Start(const WCHAR * IP, DWORD port, DWORD createThreads, DWORD 
     sessionCnt = 0;
     this->packetSize = packetSize;
    
-    if (packetSize == 1460) {
+    if (packetSize != CPacket::eBUFFER_DEFAULT) {
         packetPool = &g_PacketPool;
     }
     else {
@@ -38,6 +38,10 @@ bool CLanServer::Start(const WCHAR * IP, DWORD port, DWORD createThreads, DWORD 
 void CLanServer::Stop()
 {
     isServerOn = false;
+
+    if (packetPool != &g_PacketPool) {
+        delete packetPool;
+    }
 }
 
 int CLanServer::GetSessionCount()
@@ -101,7 +105,7 @@ void CLanServer::HeaderAlloc(CPacket* packet)
 void CLanServer::PacketFree(CPacket* packet)
 {
     if (packet->SubRef() == 0) {
-        g_PacketPool.Free(packet);
+        packetPool->Free(packet);
     }
 }
 

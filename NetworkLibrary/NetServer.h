@@ -9,7 +9,7 @@ class CNetServer
 {
 public:
 	//오픈 IP / 포트 / 워커스레드 수(생성수, 러닝수) / 나글옵션 / 최대접속자 수
-	bool Start(const WCHAR * IP, DWORD port, DWORD createThreads, DWORD runningThreads, bool isNagle, DWORD maxConnect, DWORD snapLatency);
+	bool Start(const WCHAR * IP, DWORD port, DWORD createThreads, DWORD runningThreads, bool isNagle, DWORD maxConnect, DWORD snapLatency, int packetSize = CPacket::eBUFFER_DEFAULT);
 	void Stop();
 
 	int GetSessionCount();
@@ -127,6 +127,8 @@ private:
 
 	//readonly
 	LPFN_TRANSMITPACKETS transFn;
+	CTLSMemoryPool<CPacket>* packetPool;
+	int packetSize;
 	SOCKET listenSock;
 	DWORD snapLatency;
 	HANDLE hIOCP;

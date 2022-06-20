@@ -45,11 +45,19 @@ CUnitClass::~CUnitClass()
     delete joinQ;
     delete leaveQ;
 }
-void CUnitClass::InitClass(WORD targetFrame, BYTE endOpt, WORD maxUser)
+void CUnitClass::InitClass(WORD targetFrame, BYTE endOpt, WORD maxUser, int packetSize)
 {
     frameDelay = 1000 / targetFrame;
     endOption = endOpt;
     this->maxUser = maxUser;
+    this->packetSize = packetSize;
+
+    if (packetSize == CPacket::eBUFFER_DEFAULT) {
+        packetPool = &g_PacketPool;
+    }
+    else {
+        packetPool = new CTLSMemoryPool<CPacket>;
+    }
 }
 
 bool CUnitClass::MoveClass(const WCHAR* className, DWORD64 sessionID, CPacket* packet, WORD classIdx)
@@ -81,7 +89,12 @@ bool CUnitClass::SendPacket(DWORD64 sessionID, CPacket* packet)
 
 CPacket* CUnitClass::PacketAlloc()
 {
-    CPacket* packet = g_PacketPool.Alloc();
+    CPacket* packet = packetPool->Alloc();
+    if (packet->GetBufferSize() != packetSize) {
+        packet->~CPacket();
+        new (packet)CPacket(packetSize);
+    }
+
     packet->AddRef(1);
     packet->Clear();
     packet->MoveWritePos(sizeof(GAME_PACKET_HEADER));
@@ -92,7 +105,7 @@ CPacket* CUnitClass::PacketAlloc()
 void CUnitClass::PacketFree(CPacket* packet)
 {
     if (packet->SubRef() == 0) {
-        g_PacketPool.Free(packet);
+        packetPool->Free(packet);
     }
 }
 
