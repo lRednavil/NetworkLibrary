@@ -17,6 +17,8 @@ public:
 	//기본 참조카운트 1부여 및 초기화 실행
 	CPacket* PacketAlloc();
 	void	PacketFree(CPacket* packet);
+	int GetPacketPoolCapacity();
+	int GetPacketPoolUse();
 
 	//시동함수 작성용
 	virtual void Init() = 0;
@@ -64,6 +66,8 @@ private:
 	void RecvProc(SESSION* session);
 	bool RecvPost(SESSION* session);
 	bool SendPost(SESSION* session);
+
+	
 
 private:
 	//array for session

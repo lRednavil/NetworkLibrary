@@ -300,10 +300,12 @@ void CLanClient::_WorkProc()
         for (cnt = 0; cnt < CLIENT_MAX; cnt++) {
             if (clientArr[cnt] == NULL) continue;
 
-			FD_SET(clientArr[cnt]->sock, &readSet);
             if(clientArr[cnt]->isConnected == false || clientArr[cnt]->sendQ.GetSize())
 			    FD_SET(clientArr[cnt]->sock, &writeSet);
-			FD_SET(clientArr[cnt]->sock, &exptSet);
+            if (clientArr[cnt]->isConnected) {
+                FD_SET(clientArr[cnt]->sock, &readSet);
+                FD_SET(clientArr[cnt]->sock, &exptSet);
+            }
         }
         
         ret = select(0, &readSet, &writeSet, &exptSet, &tv);

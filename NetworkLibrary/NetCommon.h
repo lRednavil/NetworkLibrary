@@ -31,46 +31,6 @@ struct OVERLAPPEDEX {
 	WORD type;
 };
 
-struct SESSION {
-	OVERLAPPEDEX recvOver;
-	OVERLAPPEDEX sendOver;
-	
-	//session refCnt의 역할
-	alignas(64)
-		DWORD64 ioCnt;
-	alignas(64)
-		short isSending;
-	//send 후 해제용
-	CPacket* sendBuf[SEND_PACKET_MAX];
-	//monitor
-	DWORD sendCnt; // << 보낸 메세지수 확보
-
-	//네트워크 메세지용 버퍼들
-	alignas(64)
-		CRingBuffer recvQ;
-	alignas(64)
-		CLockFreeQueue<CPacket*> sendQ;
-	alignas(64)
-		SOCKET sock;
-
-	//readonly
-	alignas(64)
-		DWORD64 sessionID;
-
-	//timeOut용 변수들
-	DWORD lastTime;
-	DWORD timeOutVal;
-	bool isTimeOutReserved = false;
-	bool isDisconnectReserved = false;
-
-	WCHAR IP[16];
-
-	SESSION() {
-		ioCnt = RELEASE_FLAG;
-		isSending = 0;
-	}
-};
-
 #pragma pack(push, 1)
 struct NET_HEADER {
 	BYTE staticCode;

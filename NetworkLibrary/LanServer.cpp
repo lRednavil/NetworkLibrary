@@ -2,6 +2,41 @@
 #include "LanServer.h"
 #include "LanCommon.h"
 
+
+struct SESSION {
+    OVERLAPPEDEX recvOver;
+    OVERLAPPEDEX sendOver;
+    //session refCnt의 역할
+    alignas(64)
+        DWORD64 ioCnt;
+    alignas(64)
+        short isSending;
+
+    //네트워크 메세지용 버퍼들
+    alignas(64)
+        CRingBuffer recvQ;
+    alignas(64)
+        CLockFreeQueue<CPacket*> sendQ;
+    alignas(64)
+    //send 후 해제용
+    CPacket* sendBuf[SEND_PACKET_MAX];
+    alignas(64)
+        SOCKET sock;
+
+    alignas(64)
+        DWORD64 sessionID;
+    //monitor
+    DWORD sendCnt; // << 보낸 메세지수 확보
+
+    //readonly
+    WCHAR IP[16];
+
+    SESSION() {
+        ioCnt = RELEASE_FLAG;
+    }
+};
+
+
 bool CLanServer::Start(const WCHAR * IP, DWORD port, DWORD createThreads, DWORD runningThreads, bool isNagle, DWORD maxConnect, DWORD packetSize)
 {
     if (NetInit(IP, port, isNagle) == false) {
@@ -612,4 +647,14 @@ bool CLanServer::SendPost(SESSION* session)
     }
 
     return true;
+}
+
+int CLanServer::GetPacketPoolCapacity()
+{
+    return packetPool->GetCapacityCount();
+}
+
+int CLanServer::GetPacketPoolUse()
+{
+    return packetPool->GetUseCount();
 }

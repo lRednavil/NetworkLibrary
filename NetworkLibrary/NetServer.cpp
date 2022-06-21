@@ -3,6 +3,46 @@
 #include "NetCommon.h"
 #include <timeapi.h>
 
+struct SESSION {
+	OVERLAPPEDEX recvOver;
+	OVERLAPPEDEX sendOver;
+
+	//session refCnt의 역할
+	alignas(64)
+		DWORD64 ioCnt;
+	alignas(64)
+		short isSending;
+	//send 후 해제용
+	CPacket* sendBuf[SEND_PACKET_MAX];
+	//monitor
+	DWORD sendCnt; // << 보낸 메세지수 확보
+
+	//네트워크 메세지용 버퍼들
+	alignas(64)
+		CRingBuffer recvQ;
+	alignas(64)
+		CLockFreeQueue<CPacket*> sendQ;
+	alignas(64)
+		SOCKET sock;
+
+	//readonly
+	alignas(64)
+		DWORD64 sessionID;
+
+	//timeOut용 변수들
+	DWORD lastTime;
+	DWORD timeOutVal;
+	bool isTimeOutReserved = false;
+	bool isDisconnectReserved = false;
+
+	WCHAR IP[16];
+
+	SESSION() {
+		ioCnt = RELEASE_FLAG;
+		isSending = 0;
+	}
+};
+
 //#define PROFILE_MODE
 #include "TimeTracker.h"
 bool CNetServer::Start(const WCHAR * IP, DWORD port, DWORD createThreads, DWORD runningThreads, bool isNagle, DWORD maxConnect, DWORD snapLatency, int packetSize)
@@ -265,6 +305,16 @@ void CNetServer::PacketFree(CPacket* packet)
 	if (packet->SubRef() == 0) {
 		packetPool->Free(packet);
 	}
+}
+
+int CNetServer::GetPacketPoolCapacity()
+{
+	return packetPool->GetCapacityCount();
+}
+
+int CNetServer::GetPacketPoolUse()
+{
+	return packetPool->GetUseCount();
 }
 
 void CNetServer::SetTimeOut(DWORD64 sessionID, DWORD timeVal, bool recvTimeReset)

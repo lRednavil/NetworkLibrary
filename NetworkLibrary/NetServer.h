@@ -26,6 +26,8 @@ public:
 	//기본 참조카운트 1부여 및 초기화 실행
 	CPacket* PacketAlloc();
 	void	PacketFree(CPacket* packet);
+	int		GetPacketPoolCapacity();
+	int		GetPacketPoolUse();
 
 	void SetTimeOut(DWORD64 sessionID, DWORD timeVal, bool recvTimeReset = false);
 
