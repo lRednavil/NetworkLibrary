@@ -13,8 +13,6 @@ public:
 	void Stop();
 
 	int GetSessionCount();
-	//모니터링용 함수
-	void Monitor();
 
 	bool Disconnect(DWORD64 sessionID);
 	bool SendPacket(DWORD64 sessionID, CPacket* packet);
