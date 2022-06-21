@@ -11,28 +11,27 @@ struct SESSION {
         DWORD64 ioCnt;
     alignas(64)
         short isSending;
-
+    //send 후 해제용
+    CPacket* sendBuf[SEND_PACKET_MAX];
+    //monitor
+    DWORD sendCnt; // << 보낸 메세지수 확보
     //네트워크 메세지용 버퍼들
     alignas(64)
         CRingBuffer recvQ;
     alignas(64)
         CLockFreeQueue<CPacket*> sendQ;
     alignas(64)
-    //send 후 해제용
-    CPacket* sendBuf[SEND_PACKET_MAX];
-    alignas(64)
         SOCKET sock;
 
+    //readonly
     alignas(64)
         DWORD64 sessionID;
-    //monitor
-    DWORD sendCnt; // << 보낸 메세지수 확보
 
-    //readonly
     WCHAR IP[16];
 
     SESSION() {
         ioCnt = RELEASE_FLAG;
+        isSending = 0;
     }
 };
 
@@ -536,22 +535,22 @@ void CLanServer::RecvProc(SESSION* session)
 
 bool CLanServer::RecvPost(SESSION* session)
 {
-    int ret;
-    int err;
+	int ret;
+	int err;
 
-    CRingBuffer* recvQ = &session->recvQ;
+	CRingBuffer* recvQ = &session->recvQ;
 
-    DWORD len;
-    DWORD flag = 0;
+	DWORD len;
+	DWORD flag = 0;
 
-    WSABUF pBuf[2];
+	WSABUF pBuf[2];
 
-    len = recvQ->DirectEnqueueSize();
+	len = recvQ->DirectEnqueueSize();
 
-    pBuf[0] = { len, recvQ->GetRearBufferPtr() };
-    pBuf[1] = { recvQ->GetFreeSize() - len, recvQ->GetBufferPtr() };
+	pBuf[0] = { len, recvQ->GetRearBufferPtr() };
+	pBuf[1] = { recvQ->GetFreeSize() - len, recvQ->GetBufferPtr() };
 
-    ret = WSARecv(InterlockedAdd64((__int64*)&session->sock, 0), pBuf, 2, NULL, &flag, (LPWSAOVERLAPPED)&session->recvOver, NULL);
+	ret = WSARecv(InterlockedAdd64((__int64*)&session->sock, 0), pBuf, 2, NULL, &flag, (LPWSAOVERLAPPED)&session->recvOver, NULL);
 
     if (ret == SOCKET_ERROR) {
         err = WSAGetLastError();
