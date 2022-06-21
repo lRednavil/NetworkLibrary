@@ -12,7 +12,8 @@ public:
 
 	bool Disconnect(DWORD64 sessionID);
 	bool SendPacket(DWORD64 sessionID, CPacket* packet);
-
+	//접속자 전원에게 send
+	void SendPacketToAll(CPacket* packet);
 	//기본 참조카운트 1부여 및 초기화 실행
 	CPacket* PacketAlloc();
 	void	PacketFree(CPacket* packet);
@@ -80,6 +81,7 @@ private:
 
 	//readonly
 	CTLSMemoryPool<CPacket>* packetPool;
+	DWORD maxConnection;
 	int packetSize;
 	SOCKET listenSock;
 	HANDLE hIOCP;

@@ -142,6 +142,18 @@ bool CNetServer::SendPacket(DWORD64 sessionID, CPacket* packet)
 	return true;
 }
 
+void CNetServer::SendPacketToAll(CPacket* packet)
+{
+	int idx;
+	SESSION* session;
+
+	packet->AddRef(maxConnection);
+	for (idx = 0; idx < maxConnection; idx++) {
+		SendPacket(sessionArr[idx].sessionID, packet);
+	}
+	PacketFree(packet);
+}
+
 bool CNetServer::SendEnQ(DWORD64 sessionID, CPacket* packet)
 {
 	SESSION* session = AcquireSession(sessionID);

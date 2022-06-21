@@ -16,7 +16,6 @@
 #include <thread>
 #include <WS2tcpip.h>
 
-#include <WS2spi.h>
 #include <MSWSock.h>
 
 #pragma comment (lib, "WS2_32")

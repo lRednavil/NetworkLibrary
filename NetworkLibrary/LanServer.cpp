@@ -13,6 +13,7 @@ bool CLanServer::Start(const WCHAR * IP, DWORD port, DWORD createThreads, DWORD 
 
     totalAccept = 0;
     sessionCnt = 0;
+    maxConnection = maxConnect;
     this->packetSize = packetSize;
    
     if (packetSize != CPacket::eBUFFER_DEFAULT) {
@@ -80,6 +81,18 @@ bool CLanServer::SendPacket(DWORD64 sessionID, CPacket* packet)
         LoseSession(session);
     }
     return true;
+}
+
+void CLanServer::SendPacketToAll(CPacket* packet)
+{
+    int idx;
+    SESSION* session;
+
+    packet->AddRef(maxConnection);
+    for (idx = 0; idx < maxConnection; idx++) {
+        SendPacket(sessionArr[idx].sessionID, packet);
+    }
+    PacketFree(packet);
 }
 
 CPacket* CLanServer::PacketAlloc()

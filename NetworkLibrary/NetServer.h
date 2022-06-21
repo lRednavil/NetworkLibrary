@@ -18,6 +18,8 @@ public:
 
 	bool Disconnect(DWORD64 sessionID);
 	bool SendPacket(DWORD64 sessionID, CPacket* packet);
+	//접속자 전원에게 send
+	void SendPacketToAll(CPacket* packet);
 	//가볍게 enq만 할 경우
 	bool SendEnQ(DWORD64 sessionID, CPacket* packet);
 	bool SendAndDisconnect(DWORD64 sessionID, CPacket* packet);
