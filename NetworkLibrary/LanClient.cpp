@@ -379,12 +379,14 @@ void CLanClient::RecvProc(CLIENT* client)
                 break;
             }
             else {
+                client->isConnected = false;
                 destClient->OnError(err, L"Recv Error");
                 return;
             }
         }
 
         if (ret == 0) {
+            client->isConnected = false;
             destClient->OnDisconnect();
             return;
         }
@@ -408,7 +410,7 @@ void CLanClient::RecvProc(CLIENT* client)
         }
 
         packet = PacketAlloc();
-        
+
         //헤더영역 dequeue
         recvQ->Dequeue((char*)packet->GetBufferPtr(), sizeof(lanHeader) + lanHeader.len);
         packet->MoveWritePos(lanHeader.len);
@@ -464,6 +466,7 @@ bool CLanClient::SendPost(CLIENT* client)
         err = WSAGetLastError();
         if (err != WSAEWOULDBLOCK) {
             client->belongClient->OnError(err, L"Send Failed");
+            client->isConnected = false;
             return false;
         }
     }

@@ -539,12 +539,14 @@ void CNetClient::RecvProc(CLIENT* client)
                 break;
             }
             else {
+                client->isConnected = false;
                 destClient->OnError(err, L"Recv Error");
                 return;
             }
         }
 
         if (ret == 0) {
+            client->isConnected = false;
             destClient->OnDisconnect();
             return;
         }
@@ -648,6 +650,7 @@ bool CNetClient::SendPost(CLIENT* client)
     if (ret == SOCKET_ERROR) {
         err = WSAGetLastError();
         if (err != WSAEWOULDBLOCK) {
+            client->isConnected = false;
             client->belongClient->OnError(err, L"Send Failed");
             return false;
         }
