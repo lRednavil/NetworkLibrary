@@ -838,8 +838,6 @@ void CNetServer::RecvProc(SESSION* session)
 			return;
 		}
 
-		InterlockedIncrement(&totalRecv);
-
 		//헤더영역 dequeue
 		recvQ->Dequeue((char*)packet->GetBufferPtr(), sizeof(netHeader) + netHeader.len);
 		packet->MoveWritePos(netHeader.len);
@@ -956,8 +954,6 @@ bool CNetServer::SendPost(SESSION* session)
 	//MEMORY_CLEAR(pBuf, WSABUFSIZE);
 	MEMORY_CLEAR(pBuf, TRANSBUFSIZE);
 
-	InterlockedAdd64((__int64*)&totalSend, sendCnt);
-
 	for (cnt = 0; cnt < sendCnt; ++cnt) {
 		sendQ->Dequeue(&packet);
 		session->sendBuf[cnt] = packet;
@@ -1002,4 +998,11 @@ bool CNetServer::SendPost(SESSION* session)
 	}
 
 	return true;
+}
+
+DWORD64 CNetServer::GetAcceptTPS()
+{
+	DWORD64 ret = totalAccept - lastAccept;
+	lastAccept = totalAccept;
+	return ret;
 }
