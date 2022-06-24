@@ -25,7 +25,7 @@ public:
 	CUnitClass();
 	virtual ~CUnitClass();
 
-	void InitClass(WORD targetFrame, BYTE endOpt, WORD maxUser, int packetSize = CPacket::eBUFFER_DEFAULT);
+	void InitClass(WORD targetFrame, BYTE endOpt, WORD maxUser);
 	
 	//server참조 함수들
 	
@@ -42,6 +42,8 @@ public:
 	//기본 참조카운트 1부여 및 초기화 실행
 	CPacket* PacketAlloc();
 	void	PacketFree(CPacket* packet);
+	int		GetPacketPoolCapacity();
+	int		GetPacketPoolUse();
 
 	void SetTimeOut(DWORD64 sessionID, DWORD timeVal);
 
@@ -80,8 +82,6 @@ private:
 	CLockFreeQueue<MOVE_INFO>* joinQ;
 	CLockFreeQueue<MOVE_INFO>* leaveQ;
 	WORD frameDelay; //1초 / targetFrame
-	CTLSMemoryPool<CPacket>* packetPool;
-	int packetSize;
 	BYTE endOption;
 	CGameServer* server = nullptr;
 };
@@ -114,21 +114,24 @@ public:
 	virtual ~CGameServer();
 
 	//오픈 IP / 포트 / 워커스레드 수(생성수, 러닝수) / 나글옵션 / 최대접속자 수
-	bool Start(WCHAR* IP, DWORD port, DWORD createThreads, DWORD runningThreads, bool isNagle, DWORD maxConnect);
+	bool Start(WCHAR* IP, DWORD port, DWORD createThreads, DWORD runningThreads, bool isNagle, DWORD maxConnect, int packetSize = CPacket::eBUFFER_DEFAULT);
 	void Stop();
 
 	int GetSessionCount();
-	//모니터링용 함수
-	void Monitor();
 
 	bool Disconnect(DWORD64 sessionID);
 	bool SendPacket(DWORD64 sessionID, CPacket* packet);
 
 	//기본 참조카운트 1부여 및 초기화 실행
-	inline CPacket* PacketAlloc();
-	inline void	PacketFree(CPacket* packet);
+	CPacket* PacketAlloc();
+	void	PacketFree(CPacket* packet);
+	int		GetPacketPoolCapacity();
+	int		GetPacketPoolUse();
 
 	void SetTimeOut(DWORD64 sessionID, DWORD timeVal);
+
+	DWORD64 GetTotalAccept();
+	DWORD64 GetAcceptTPS();
 
 	//virtual함수 영역
 	//accept 직후, IP filterinig 등의 목적
@@ -141,7 +144,7 @@ public:
 	
 	//gameServer용 함수
 	bool MoveClass(const WCHAR* tagName, DWORD64 sessionID, CPacket* packet = NULL, WORD classIdx = -1);
-	bool MoveClass(const WCHAR* tagName, DWORD64* sessionIDs, WORD sessionCnt, WORD classIdx = -1);
+	//bool MoveClass(const WCHAR* tagName, DWORD64* sessionIDs, WORD sessionCnt, WORD classIdx = -1);
 	bool FollowClass(DWORD64 targetID, DWORD64 followID, CPacket* packet = NULL);
 
 	//같은 tagName의 tcb존재시 유효여부 판단 후 부착 or 새로운 tcb 생성 및 스레드 생성
@@ -180,6 +183,12 @@ private:
 	static unsigned int __stdcall TimerProc(void* arg);
 	//업데이트 스레드에 해당하는 함수
 	static unsigned int __stdcall UnitProc(void* arg);
+
+	void _WorkProc();
+	void _AcceptProc();
+	void _TimerProc();
+	void _UnitProc(CUSTOM_TCB* tcb);
+
 	void RecvProc(SESSION* session);
 	bool RecvPost(SESSION* session);
 	bool SendPost(SESSION* session);
@@ -190,15 +199,8 @@ private:
 protected:
 	//sessionID 겸용
 	DWORD64 totalAccept = 0;
-	DWORD64 totalSend = 0;
-	DWORD64 totalRecv = 0;
 	//tps측정용 기억
 	DWORD64 lastAccept = 0;
-	DWORD64 lastSend = 0;
-	DWORD64 lastRecv = 0;
-
-	DWORD64 recvBytes = 0;
-	DWORD64 sendBytes = 0;
 
 	//시간 기억
 	DWORD currentTime;
@@ -212,6 +214,7 @@ private:
 	SESSION* sessionArr;
 	//stack for session index
 	CLockFreeStack<int> sessionStack;
+	CLockFreeQueue<DWORD64> sendSessionQ;
 
 	//monitor
 	DWORD sessionCnt;
@@ -225,6 +228,8 @@ private:
 	//readonly
 	SOCKET listenSock;
 	HANDLE hIOCP;
+	CTLSMemoryPool<CPacket>* packetPool;
+	int packetSize;
 
 	HANDLE* hThreads;
 };

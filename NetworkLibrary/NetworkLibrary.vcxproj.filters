@@ -37,6 +37,12 @@
     <Filter Include="소스 파일\NetServer">
       <UniqueIdentifier>{95725255-16c3-41e0-8947-7d644ac8f599}</UniqueIdentifier>
     </Filter>
+    <Filter Include="소스 파일\GameServer">
+      <UniqueIdentifier>{4d893625-8621-4218-8646-d42cd53a0376}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="헤더 파일\GameServer">
+      <UniqueIdentifier>{900c10cd-bd6a-40d4-94f0-2375069af2f2}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="framework.h">
@@ -46,9 +52,6 @@
       <Filter>헤더 파일</Filter>
     </ClInclude>
     <ClInclude Include="Lock.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
-    <ClInclude Include="GameServer.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
     <ClInclude Include="MemoryPool.h">
@@ -102,9 +105,6 @@
     <ClInclude Include="NetServer.h">
       <Filter>헤더 파일\NetServer</Filter>
     </ClInclude>
-    <ClInclude Include="GameCommon.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
     <ClInclude Include="TimeTracker.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
@@ -113,6 +113,12 @@
     </ClInclude>
     <ClInclude Include="LibraryCommon.h">
       <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="GameCommon.h">
+      <Filter>헤더 파일\GameServer</Filter>
+    </ClInclude>
+    <ClInclude Include="GameServer.h">
+      <Filter>헤더 파일\GameServer</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -123,9 +129,6 @@
       <Filter>소스 파일</Filter>
     </ClCompile>
     <ClCompile Include="Lock.cpp">
-      <Filter>소스 파일</Filter>
-    </ClCompile>
-    <ClCompile Include="GameServer.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
     <ClCompile Include="LanClient.cpp">
@@ -178,6 +181,9 @@
     </ClCompile>
     <ClCompile Include="LibraryCommon.cpp">
       <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="GameServer.cpp">
+      <Filter>소스 파일\GameServer</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

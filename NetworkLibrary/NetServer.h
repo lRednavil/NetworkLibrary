@@ -31,6 +31,7 @@ public:
 
 	void SetTimeOut(DWORD64 sessionID, DWORD timeVal, bool recvTimeReset = false);
 
+	DWORD64 GetTotalAccept();
 	DWORD64 GetAcceptTPS();
 
 	//시동함수 작성용
@@ -97,7 +98,6 @@ private:
 protected:
 	//sessionID 겸용
 	DWORD64 totalAccept = 0;
-	alignas(64)
 	//tps측정용 기억
 	DWORD64 lastAccept = 0;
 

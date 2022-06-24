@@ -1000,6 +1000,11 @@ bool CNetServer::SendPost(SESSION* session)
 	return true;
 }
 
+DWORD64 CNetServer::GetTotalAccept()
+{
+	return totalAccept;
+}
+
 DWORD64 CNetServer::GetAcceptTPS()
 {
 	DWORD64 ret = totalAccept - lastAccept;
