@@ -33,7 +33,7 @@ public:
 	//전해야 하는 정보가 있을 경우 packet을 통해 전달할 것
 	bool MoveClass(const WCHAR* className, DWORD64 sessionID, CPacket* packet = NULL, WORD classIdx = -1);
 	//다수 이동용
-	bool MoveClass(const WCHAR* className, DWORD64* sessionIDs, WORD sessionCnt, WORD classIdx = -1);
+	//bool MoveClass(const WCHAR* className, DWORD64* sessionIDs, WORD sessionCnt, WORD classIdx = -1);
 	bool FollowClass(DWORD64 targetID, DWORD64 followID, CPacket* packet = NULL);
 
 	bool Disconnect(DWORD64 sessionID);
@@ -114,7 +114,7 @@ public:
 	virtual ~CGameServer();
 
 	//오픈 IP / 포트 / 워커스레드 수(생성수, 러닝수) / 나글옵션 / 최대접속자 수
-	bool Start(WCHAR* IP, DWORD port, DWORD createThreads, DWORD runningThreads, bool isNagle, DWORD maxConnect, int packetSize = CPacket::eBUFFER_DEFAULT);
+	bool Start(WCHAR* IP, DWORD port, DWORD createThreads, DWORD runningThreads, bool isNagle, DWORD maxConnect, int sendLatency, int packetSize = CPacket::eBUFFER_DEFAULT);
 	void Stop();
 
 	int GetSessionCount();
@@ -181,12 +181,14 @@ private:
 	static unsigned int __stdcall WorkProc(void* arg);
 	static unsigned int __stdcall AcceptProc(void* arg);
 	static unsigned int __stdcall TimerProc(void* arg);
+	static unsigned int __stdcall SendThread(void* arg);
 	//업데이트 스레드에 해당하는 함수
 	static unsigned int __stdcall UnitProc(void* arg);
 
 	void _WorkProc();
 	void _AcceptProc();
 	void _TimerProc();
+	void _SendThread();
 	void _UnitProc(CUSTOM_TCB* tcb);
 
 	void RecvProc(SESSION* session);
@@ -230,6 +232,7 @@ private:
 	HANDLE hIOCP;
 	CTLSMemoryPool<CPacket>* packetPool;
 	int packetSize;
+	int sendLatency;
 
 	HANDLE* hThreads;
 };
