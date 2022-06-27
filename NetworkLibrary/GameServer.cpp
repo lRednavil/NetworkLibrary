@@ -20,7 +20,9 @@ struct SESSION {
     alignas(64)
         short isSending;
     alignas(64)
-        volatile bool isMoving;
+        short isRecving;
+    alignas(64)
+        char isMoving;
 
     //네트워크 메세지용 버퍼들
     alignas(64)
@@ -227,7 +229,7 @@ END:
         info.sessionID = sessionID;
         info.packet = packet;
 
-        session->isMoving = true;
+        InterlockedExchange8(&session->isMoving, 1);
         session->belongClass->leaveQ->Enqueue(info);
         InterlockedDecrement16((short*)&session->belongClass->currentUser);
 
@@ -329,7 +331,7 @@ bool CGameServer::FollowClass(DWORD64 targetID, DWORD64 followID, CPacket* packe
     MOVE_INFO info;
     bool res;
 
-    follower->isMoving = true;
+    InterlockedExchange8(&follower->isMoving, 1);
 
     do {
         if (target == NULL || follower == NULL) {
@@ -648,7 +650,6 @@ bool CGameServer::MakeSession(WCHAR* IP, SOCKET sock, DWORD64* ID)
     ZeroMemory(&session->sendOver, sizeof(session->sendOver));
     session->sendOver.type = 1;
 
-    session->isMoving = true;
     session->lastTime = currentTime;
 
     session->belongClass = g_defaultClass;
@@ -787,12 +788,13 @@ void CGameServer::_WorkProc()
         //recvd
         if (overlap->type == 0) {
             if (ret == false || bytes == 0) {
-                Disconnect(sessionID);
+                LoseSession(session);
+                InterlockedDecrement16(&session->isRecving);
             }
             else
             {
                 session->recvQ.MoveRear(bytes);
-                //추가 recv에 맞춘 acquire
+                InterlockedDecrement16(&session->isRecving);
                 RecvProc(session);
                 //스레드 깨우기용 이벤트 설정
                 SetEvent(session->belongThread->hEvent);
@@ -878,7 +880,7 @@ void CGameServer::_TimerProc()
 
             if (session->ioCnt & RELEASE_FLAG) continue;
 
-            if (currentTime - session->lastTime >= session->timeOutVal) {
+            if ((DWORD)(currentTime - session->lastTime) >= session->timeOutVal) {
                 Disconnect(session->sessionID);
                 session->belongClass->OnTimeOut(session->sessionID);
             }
@@ -1034,6 +1036,11 @@ bool CGameServer::RecvPost(SESSION* session)
 
     WSABUF pBuf[2];
 
+    if (InterlockedIncrement16(&session->isRecving) != 1) {
+        InterlockedDecrement16(&session->isRecving);
+        return false;
+    }
+
     len = recvQ->DirectEnqueueSize();
 
     pBuf[0] = { len, recvQ->GetRearBufferPtr() };
@@ -1063,7 +1070,7 @@ bool CGameServer::RecvPost(SESSION* session)
                 _FILE_LOG(LOG_LEVEL_ERROR, L"LibraryLog", L"RecvPost Error %d", err);
                 session->belongClass->OnError(err, L"RecvPost Error");
             }
-            LoseSession(session);
+			LoseSession(session);
             return false;
         }
     }
@@ -1141,8 +1148,8 @@ void CGameServer::UnitJoinLeaveProc(CUnitClass* unit)
     while (unit->joinQ->Dequeue(&info)) {
         unit->OnClientJoin(info.sessionID, info.packet);
         session = FindSession(info.sessionID);
-        session->isMoving = false;
         RecvPost(session);
+        InterlockedExchange8(&session->isMoving, 0);
 
         if(info.packet)
             PacketFree(info.packet);
