@@ -1300,3 +1300,15 @@ void CGameServer::SetTimeOut(DWORD64 sessionID, DWORD timeVal)
     LoseSession(session);
 }
 
+DWORD64 CGameServer::GetTotalAccept()
+{
+    return totalAccept;
+}
+
+DWORD64 CGameServer::GetAcceptTPS()
+{
+    DWORD64 ret = totalAccept - lastAccept;
+    lastAccept = totalAccept;
+    return ret;
+}
+
