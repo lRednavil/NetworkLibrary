@@ -130,10 +130,15 @@ public:
 
 	void SetTimeOut(DWORD64 sessionID, DWORD timeVal);
 
+	bool IsServerOn();
 	DWORD64 GetTotalAccept();
 	DWORD64 GetAcceptTPS();
+	DWORD64 GetRecvTPS();
+	DWORD64 GetSendTPS();
 
 	//virtual함수 영역
+	//시동함수 작성용
+	virtual void Init() = 0;
 	//accept 직후, IP filterinig 등의 목적
 	virtual bool OnConnectionRequest(WCHAR* IP, DWORD Port) = 0;
 	//return false; 시 클라이언트 거부.
@@ -141,6 +146,8 @@ public:
 	virtual bool OnClientJoin(DWORD64 sessionID) = 0;
 	virtual bool OnClientLeave(DWORD64 sessionID) = 0;
 
+	//종료함수 작성용
+	virtual void OnStop() = 0;
 	
 	//gameServer용 함수
 	bool MoveClass(const WCHAR* tagName, DWORD64 sessionID, CPacket* packet = NULL, WORD classIdx = -1);
@@ -201,8 +208,14 @@ private:
 protected:
 	//sessionID 겸용
 	DWORD64 totalAccept = 0;
+	alignas(64)
+		DWORD64 totalSend = 0;
+	alignas(64)
+		DWORD64 totalRecv = 0;
 	//tps측정용 기억
 	DWORD64 lastAccept = 0;
+	DWORD64 lastSend = 0;
+	DWORD64 lastRecv = 0;
 
 	//시간 기억
 	DWORD currentTime;

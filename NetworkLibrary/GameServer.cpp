@@ -1018,6 +1018,8 @@ void CGameServer::RecvProc(SESSION* session)
 		packet->MoveReadPos(sizeof(packetHeader));
 
         classPtr->OnRecv(session->sessionID, packet);
+
+        InterlockedIncrement64((__int64*)&totalRecv);
 	}
 
     if(session->isMoving == false)
@@ -1094,25 +1096,25 @@ bool CGameServer::SendPost(SESSION* session)
     WSABUF pBuf[SEND_PACKET_MAX];
 
     sendQ = &session->sendQ;
-    sendCnt = sendQ->GetSize();
-
-    session->sendCnt = min(SEND_PACKET_MAX, sendCnt);
+    sendCnt = min(sendQ->GetSize(), SEND_PACKET_MAX);
+    session->sendCnt = sendCnt;
     ZeroMemory(pBuf, sizeof(WSABUF) * SEND_PACKET_MAX);
 
-    for (cnt = 0; cnt < session->sendCnt; cnt++) {
+    for (cnt = 0; cnt < sendCnt; cnt++) {
         sendQ->Dequeue(&packet);
         session->sendBuf[cnt] = packet;
         pBuf[cnt].buf = packet->GetBufferPtr();
         pBuf[cnt].len = packet->GetDataSize();
     }
 
-    ret = WSASend(InterlockedOr64((__int64*)&session->sock, 0), pBuf, session->sendCnt, NULL, 0, (LPWSAOVERLAPPED)&session->sendOver, NULL);
+    ret = WSASend(InterlockedOr64((__int64*)&session->sock, 0), pBuf, sendCnt, NULL, 0, (LPWSAOVERLAPPED)&session->sendOver, NULL);
 
     if (ret == SOCKET_ERROR) {
         err = WSAGetLastError();
 
         if (err == WSA_IO_PENDING) {
             //good
+            InterlockedAdd64((__int64*)&totalSend, sendCnt);
         }
         else {
             switch (err) {
@@ -1300,6 +1302,11 @@ void CGameServer::SetTimeOut(DWORD64 sessionID, DWORD timeVal)
     LoseSession(session);
 }
 
+bool CGameServer::IsServerOn()
+{
+    return isServerOn;
+}
+
 DWORD64 CGameServer::GetTotalAccept()
 {
     return totalAccept;
@@ -1309,6 +1316,20 @@ DWORD64 CGameServer::GetAcceptTPS()
 {
     DWORD64 ret = totalAccept - lastAccept;
     lastAccept = totalAccept;
+    return ret;
+}
+
+DWORD64 CGameServer::GetRecvTPS()
+{
+    DWORD64 ret = totalRecv - lastRecv;
+    lastRecv = totalRecv;
+    return ret;
+}
+
+DWORD64 CGameServer::GetSendTPS()
+{
+    DWORD64 ret = totalSend - lastSend;
+    lastSend = totalSend;
     return ret;
 }
 
