@@ -20,8 +20,7 @@ struct SESSION {
 	//네트워크 메세지용 버퍼들
 	alignas(64)
 		CRingBuffer recvQ;
-	alignas(64)
-		CLockFreeQueue<CPacket*> sendQ;
+		CRingBuffer sendQ;
 	alignas(64)
 		SOCKET sock;
 
@@ -130,7 +129,7 @@ bool CNetServer::SendPacket(DWORD64 sessionID, CPacket* packet)
 		HeaderAlloc(packet);
 		Encode(packet);
 	}
-	session->sendQ.Enqueue(packet);
+	session->sendQ.Enqueue((char*)&packet, sizeof(void*));
 
 	//if (session->isSending == 0) {
 	//	SendPost(session);
@@ -176,7 +175,7 @@ bool CNetServer::SendEnQ(DWORD64 sessionID, CPacket* packet)
 		Encode(packet);
 	}
 
-	session->sendQ.Enqueue(packet);
+//	session->sendQ.Enqueue(packet);
 	LoseSession(session);
 
 	return true;
@@ -193,7 +192,7 @@ bool CNetServer::SendAndDisconnect(DWORD64 sessionID, CPacket* packet)
 
 	HeaderAlloc(packet);
 	Encode(packet);
-	session->sendQ.Enqueue(packet);
+	session->sendQ.Enqueue((char*)&packet, sizeof(void*));
 	session->isDisconnectReserved = true;
 	SendPost(session);
 
@@ -211,7 +210,7 @@ bool CNetServer::SendAndDisconnect(DWORD64 sessionID, CPacket* packet, DWORD tim
 
 	HeaderAlloc(packet);
 	Encode(packet);
-	session->sendQ.Enqueue(packet);
+	session->sendQ.Enqueue((char*)&packet, sizeof(void*));
 	SendPost(session);
 	session->isTimeOutReserved = true;
 	SetTimeOut(sessionID, timeOutVal, true);
@@ -561,8 +560,9 @@ void CNetServer::ReleaseSession(SESSION* session)
 	closesocket(session->sock & ~RELEASE_FLAG);
 
 	//남은 Q 찌꺼기 제거
-	while (session->sendQ.Dequeue(&packet))
+	while (session->sendQ.GetUsedSize())
 	{
+		session->sendQ.Dequeue((char*)&packet, sizeof(void*));
 		PacketFree(packet);
 	}
 
@@ -674,7 +674,7 @@ void CNetServer::_WorkProc()
 				PacketFree(sendBuf[sendCnt]);
 			}
 
-			if (session->sendQ.GetSize() != 0) {
+			if (session->sendQ.GetUsedSize() != 0) {
 				AcquireSession(sessionID);
 				SendPost(session);
 			}
@@ -934,7 +934,8 @@ bool CNetServer::SendPost(SESSION* session)
 	WORD cnt;
 	int sendCnt;
 
-	CLockFreeQueue<CPacket*>* sendQ;
+	//CLockFreeQueue<CPacket*>* sendQ;
+	CRingBuffer* sendQ;
 	CPacket* packet;
 
 	//WSABUF pBuf[SEND_PACKET_MAX];
@@ -947,7 +948,7 @@ bool CNetServer::SendPost(SESSION* session)
 	//}
 
 	sendQ = &session->sendQ;
-	sendCnt = sendQ->GetSize();
+	sendCnt = sendQ->GetUsedSize() / sizeof(void*);
 	if (sendCnt > SEND_PACKET_MAX) sendCnt = SEND_PACKET_MAX;
 	
 	session->sendCnt = sendCnt;
@@ -955,7 +956,7 @@ bool CNetServer::SendPost(SESSION* session)
 	MEMORY_CLEAR(pBuf, TRANSBUFSIZE);
 
 	for (cnt = 0; cnt < sendCnt; ++cnt) {
-		sendQ->Dequeue(&packet);
+		sendQ->Dequeue((char*)&packet, sizeof(void*));
 		session->sendBuf[cnt] = packet;
 		pBuf[cnt].dwElFlags = TP_ELEMENT_MEMORY;
 		pBuf[cnt].cLength = packet->GetDataSize();
