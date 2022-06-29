@@ -47,11 +47,8 @@ private:
 
 	//read field
 	alignas(64)
-	__int64* paramArr;
-	int paramCnt = 0;
 	bool newCall;
 	int capacity;
-	void** dataParams;
 };
 
 template<class DATA>
