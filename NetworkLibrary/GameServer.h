@@ -41,6 +41,7 @@ public:
 
 	//기본 참조카운트 1부여 및 초기화 실행
 	CPacket* PacketAlloc();
+	CPacket* InfoAlloc();
 	void	PacketFree(CPacket* packet);
 	int		GetPacketPoolCapacity();
 	int		GetPacketPoolUse();
@@ -124,6 +125,7 @@ public:
 
 	//기본 참조카운트 1부여 및 초기화 실행
 	CPacket* PacketAlloc();
+	CPacket* InfoAlloc();
 	void	PacketFree(CPacket* packet);
 	int		GetPacketPoolCapacity();
 	int		GetPacketPoolUse();
@@ -229,7 +231,6 @@ private:
 	SESSION* sessionArr;
 	//stack for session index
 	CLockFreeStack<int> sessionStack;
-	CLockFreeQueue<DWORD64> sendSessionQ;
 
 	//monitor
 	DWORD sessionCnt;

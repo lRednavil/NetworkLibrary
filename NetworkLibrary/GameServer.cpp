@@ -18,8 +18,6 @@ struct SESSION {
     alignas(64)
         DWORD64 ioCnt;
     alignas(64)
-        short isSending;
-    alignas(64)
         short isRecving;
     alignas(64)
         char isMoving;
@@ -53,7 +51,6 @@ struct SESSION {
 
     SESSION() {
         ioCnt = RELEASE_FLAG;
-        isSending = 0;
     }
 };
 //최초 접속시 있을 더미 클래스
@@ -128,6 +125,11 @@ bool CUnitClass::SendPacket(DWORD64 sessionID, CPacket* packet)
 CPacket* CUnitClass::PacketAlloc()
 {
     return server->PacketAlloc();
+}
+
+CPacket* CUnitClass::InfoAlloc()
+{
+    return server->InfoAlloc();
 }
 
 void CUnitClass::PacketFree(CPacket* packet)
@@ -701,7 +703,6 @@ void CGameServer::ReleaseSession(SESSION* session)
 
     session->recvQ.ClearBuffer();
 
-    session->isSending = 0;
     InterlockedDecrement(&sessionCnt);
 
     PostQueuedCompletionStatus(hIOCP, 0, session->sessionID, (LPOVERLAPPED)OV_DISCONNECT);
@@ -806,14 +807,6 @@ void CGameServer::_WorkProc()
                 --session->sendCnt;
                 session->belongClass->PacketFree(session->sendBuf[session->sendCnt]);
             }
-
-            if (session->sendQ.GetSize() != 0) {
-                AcquireSession(sessionID);
-                SendPost(session);
-            }
-            else {
-                InterlockedDecrement16(&session->isSending);
-            }
             //작업 완료에 대한 lose
             LoseSession(session);
         }
@@ -893,19 +886,16 @@ void CGameServer::_TimerProc()
 
 void CGameServer::_SendThread()
 {
-    int lim;
+    int cnt;
     SESSION* session;
     DWORD64 sessionID;
     while (isServerOn) {
-        lim = sendSessionQ.GetSize();
-        while (lim) {
-            sendSessionQ.Dequeue(&sessionID);
-            session = AcquireSession(sessionID);
+        for(cnt = 0; cnt < maxConnection; cnt++){
+            session = AcquireSession(sessionArr[cnt].sessionID);
 
             if (session != NULL) {
                 SendPost(session);
             }
-            --lim;
         }
 
         Sleep(sendLatency);
@@ -1160,6 +1150,10 @@ void CGameServer::UnitJoinLeaveProc(CUnitClass* unit)
     while (unit->leaveQ->Dequeue(&info)) {
         unit->OnClientLeave(info.sessionID);
     }
+
+    while (unit->disconncetQ->Dequeue(&info)) {
+        unit->OnClientLeave(info.sessionID);
+    }
 }
 
 bool CGameServer::Start(WCHAR* IP, DWORD port, DWORD createThreads, DWORD runningThreads, bool isNagle, DWORD maxConnect, int sendLatency, int packetSize)
@@ -1247,13 +1241,6 @@ bool CGameServer::SendPacket(DWORD64 sessionID, CPacket* packet)
     }
     session->sendQ.Enqueue(packet);
 
-    if (InterlockedIncrement16(&session->isSending) == 1) {
-        sendSessionQ.Enqueue(sessionID);
-    }
-    else {
-        InterlockedDecrement16(&session->isSending);
-    }
-
     LoseSession(session);
     return true;
 }
@@ -1270,6 +1257,16 @@ CPacket* CGameServer::PacketAlloc()
     packet->Clear();
     packet->MoveWritePos(sizeof(GAME_PACKET_HEADER));
     packet->isEncoded = false;
+    return packet;
+}
+
+CPacket* CGameServer::InfoAlloc()
+{
+    CPacket* packet = packetPool->Alloc();
+    
+    packet->AddRef(1);
+    packet->Clear();
+
     return packet;
 }
 
