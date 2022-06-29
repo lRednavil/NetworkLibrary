@@ -51,6 +51,7 @@ struct SESSION {
 
     SESSION() {
         ioCnt = RELEASE_FLAG;
+        timeOutVal = 1000;
     }
 };
 //최초 접속시 있을 더미 클래스
@@ -82,11 +83,13 @@ CUnitClass::CUnitClass()
 {
     joinQ = new CLockFreeQueue<MOVE_INFO>;
     leaveQ = new CLockFreeQueue<MOVE_INFO>;
+    disconnectQ = new CLockFreeQueue<MOVE_INFO>;
 }
 CUnitClass::~CUnitClass()
 {
     delete joinQ;
     delete leaveQ;
+    delete disconnectQ;
 }
 void CUnitClass::InitClass(WORD targetFrame, BYTE endOpt, WORD maxUser)
 {
@@ -685,23 +688,28 @@ void CGameServer::ReleaseSession(SESSION* session)
     int leftCnt;
     CPacket* packet;
     CUnitClass* classPtr = session->belongClass;
+    MOVE_INFO info;
 
     closesocket(sock & ~RELEASE_FLAG);
 
     //남은 Q 찌꺼기 제거
     while (session->sendQ.Dequeue(&packet))
     {
-        classPtr->PacketFree(packet);
+        PacketFree(packet);
     }
 
     //sendBuffer에 남은 찌꺼기 제거
     for (leftCnt = 0; leftCnt < session->sendCnt; ++leftCnt) {
         packet = session->sendBuf[leftCnt];
-        classPtr->PacketFree(packet);
+        PacketFree(packet);
     }
     session->sendCnt = 0;
 
     session->recvQ.ClearBuffer();
+
+    info.packet = NULL;
+    info.sessionID = session->sessionID;
+    classPtr->disconnectQ->Enqueue(info);
 
     InterlockedDecrement(&sessionCnt);
 
@@ -780,7 +788,6 @@ void CGameServer::_WorkProc()
         }
         //disconnect의 경우
         if ((__int64)overlap == OV_DISCONNECT) {
-			session->belongClass->OnClientDisconnected(sessionID);
 			InterlockedDecrement16((short*)&session->belongClass->currentUser);
 			sessionStack.Push(session->sessionID >> MASK_SHIFT);
             continue;
@@ -873,7 +880,7 @@ void CGameServer::_TimerProc()
 
             if (session->ioCnt & RELEASE_FLAG) continue;
 
-            if ((DWORD)(currentTime - session->lastTime) >= session->timeOutVal) {
+            if (currentTime - session->lastTime >= session->timeOutVal) {
                 Disconnect(session->sessionID);
                 session->belongClass->OnTimeOut(session->sessionID);
             }
@@ -1049,6 +1056,7 @@ bool CGameServer::RecvPost(SESSION* session)
         else {
             switch (err) {
             case 10004:
+            case 10022:
             case 10038:
             case 10053:
             case 10054:
@@ -1109,6 +1117,7 @@ bool CGameServer::SendPost(SESSION* session)
         else {
             switch (err) {
             case 10004:
+            case 10022:
             case 10038:
             case 10053:
             case 10054:
@@ -1151,8 +1160,8 @@ void CGameServer::UnitJoinLeaveProc(CUnitClass* unit)
         unit->OnClientLeave(info.sessionID);
     }
 
-    while (unit->disconncetQ->Dequeue(&info)) {
-        unit->OnClientLeave(info.sessionID);
+    while (unit->disconnectQ->Dequeue(&info)) {
+        unit->OnClientDisconnected(info.sessionID);
     }
 }
 

@@ -39,6 +39,7 @@ struct SESSION {
 
 	SESSION() {
 		ioCnt = RELEASE_FLAG;
+		timeOutVal = 1000;
 		isSending = 0;
 	}
 };
@@ -648,7 +649,7 @@ void CNetServer::_WorkProc()
 		//disconnectÀÇ °æ¿ì
 		if ((__int64)overlap == 2) {
 			OnClientLeave(sessionID);
-			sessionStack.Push(session->sessionID >> MASK_SHIFT);
+			sessionStack.Push(sessionID >> MASK_SHIFT);
 			continue;
 		}
 
@@ -760,19 +761,16 @@ void CNetServer::_TimerProc()
 	Sleep(1000);
 
 	while (isServerOn) {
-		{
+		currentTime = timeGetTime();
 
-			currentTime = timeGetTime();
+		for (cnt = 0; cnt < maxConnection; ++cnt) {
+			session = &sessionArr[cnt];
 
-			for (cnt = 0; cnt < maxConnection; ++cnt) {
-				session = &sessionArr[cnt];
+			if (session->ioCnt & RELEASE_FLAG) continue;
 
-				if (session->ioCnt & RELEASE_FLAG) continue;
-
-				if (currentTime - session->lastTime >= session->timeOutVal) {
-					Disconnect(session->sessionID);
-					OnTimeOut(session->sessionID, session->isTimeOutReserved);
-				}
+			if (currentTime - session->lastTime >= session->timeOutVal) {
+				Disconnect(session->sessionID);
+				OnTimeOut(session->sessionID, session->isTimeOutReserved);
 			}
 		}
 		Sleep(1000);

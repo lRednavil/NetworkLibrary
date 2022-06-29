@@ -82,6 +82,7 @@ private:
 	alignas(64)
 	CLockFreeQueue<MOVE_INFO>* joinQ;
 	CLockFreeQueue<MOVE_INFO>* leaveQ;
+	CLockFreeQueue<MOVE_INFO>* disconnectQ;
 	WORD frameDelay; //1√  / targetFrame
 	BYTE endOption;
 	CGameServer* server = nullptr;
