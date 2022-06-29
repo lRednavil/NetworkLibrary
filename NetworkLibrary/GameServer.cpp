@@ -27,7 +27,8 @@ struct SESSION {
     //네트워크 메세지용 버퍼들
     alignas(64)
         CRingBuffer recvQ;
-        CRingBuffer sendQ;
+    alignas(64)
+        CLockFreeQueue<CPacket*> sendQ;
     alignas(64)
         SOCKET sock; 
 
@@ -127,11 +128,6 @@ bool CUnitClass::SendPacket(DWORD64 sessionID, CPacket* packet)
 CPacket* CUnitClass::PacketAlloc()
 {
     return server->PacketAlloc();
-}
-
-CPacket* CUnitClass::InfoAlloc()
-{
-    return server->InfoAlloc();
 }
 
 void CUnitClass::PacketFree(CPacket* packet)
@@ -691,9 +687,8 @@ void CGameServer::ReleaseSession(SESSION* session)
     closesocket(sock & ~RELEASE_FLAG);
 
     //남은 Q 찌꺼기 제거
-    while (session->sendQ.GetUsedSize())
+    while (session->sendQ.Dequeue(&packet))
     {
-        session->sendQ.Enqueue((char*)&packet, sizeof(void*));
         classPtr->PacketFree(packet);
     }
 
@@ -812,7 +807,7 @@ void CGameServer::_WorkProc()
                 session->belongClass->PacketFree(session->sendBuf[session->sendCnt]);
             }
 
-            if (session->sendQ.GetUsedSize() != 0) {
+            if (session->sendQ.GetSize() != 0) {
                 AcquireSession(sessionID);
                 SendPost(session);
             }
@@ -1095,19 +1090,18 @@ bool CGameServer::SendPost(SESSION* session)
     WORD cnt;
     int sendCnt;
 
-    //CLockFreeQueue<CPacket*>* sendQ;
-    CRingBuffer* sendQ;
+    CLockFreeQueue<CPacket*>* sendQ;
     CPacket* packet;
 
     WSABUF pBuf[SEND_PACKET_MAX];
 
     sendQ = &session->sendQ;
-    sendCnt = min(sendQ->GetUsedSize() / sizeof(void*), SEND_PACKET_MAX);
+    sendCnt = min(sendQ->GetSize(), SEND_PACKET_MAX);
     session->sendCnt = sendCnt;
     ZeroMemory(pBuf, sizeof(WSABUF) * SEND_PACKET_MAX);
 
     for (cnt = 0; cnt < sendCnt; cnt++) {
-        sendQ->Dequeue((char*)&packet, sizeof(void*));
+        sendQ->Dequeue(&packet);
         session->sendBuf[cnt] = packet;
         pBuf[cnt].buf = packet->GetBufferPtr();
         pBuf[cnt].len = packet->GetDataSize();
@@ -1251,7 +1245,7 @@ bool CGameServer::SendPacket(DWORD64 sessionID, CPacket* packet)
         HeaderAlloc(packet);
         Encode(packet);
     }
-    session->sendQ.Enqueue((char*)&packet, sizeof(void*));
+    session->sendQ.Enqueue(packet);
 
     if (InterlockedIncrement16(&session->isSending) == 1) {
         sendSessionQ.Enqueue(sessionID);
@@ -1276,16 +1270,6 @@ CPacket* CGameServer::PacketAlloc()
     packet->Clear();
     packet->MoveWritePos(sizeof(GAME_PACKET_HEADER));
     packet->isEncoded = false;
-    return packet;
-}
-
-CPacket* CGameServer::InfoAlloc()
-{
-    CPacket* packet = packetPool->Alloc();
-    
-    packet->AddRef(1);
-    packet->Clear();
-
     return packet;
 }
 

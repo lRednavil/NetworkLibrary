@@ -41,7 +41,6 @@ public:
 
 	//기본 참조카운트 1부여 및 초기화 실행
 	CPacket* PacketAlloc();
-	CPacket* InfoAlloc();
 	void	PacketFree(CPacket* packet);
 	int		GetPacketPoolCapacity();
 	int		GetPacketPoolUse();
@@ -125,7 +124,6 @@ public:
 
 	//기본 참조카운트 1부여 및 초기화 실행
 	CPacket* PacketAlloc();
-	CPacket* InfoAlloc();
 	void	PacketFree(CPacket* packet);
 	int		GetPacketPoolCapacity();
 	int		GetPacketPoolUse();
