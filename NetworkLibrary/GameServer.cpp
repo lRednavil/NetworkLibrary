@@ -794,7 +794,7 @@ void CGameServer::_WorkProc()
         }
 
         //recvd
-        if (overlap->type == 0) {
+        if (overlap->type == OV_RECV) {
             if (ret == false || bytes == 0) {
                 LoseSession(session);
                 InterlockedDecrement16(&session->isRecving);
@@ -809,10 +809,14 @@ void CGameServer::_WorkProc()
             }
         }
         //sent
-        if (overlap->type == 1) {
-            while (session->sendCnt) {
-                --session->sendCnt;
-                session->belongClass->PacketFree(session->sendBuf[session->sendCnt]);
+        if (overlap->type == OV_SEND) {
+            DWORD sendCnt = session->sendCnt;
+            CPacket** sendBuf = session->sendBuf;
+            session->sendCnt = 0;
+
+            while (sendCnt) {
+                --sendCnt;
+                PacketFree(sendBuf[sendCnt]);
             }
             //작업 완료에 대한 lose
             LoseSession(session);
