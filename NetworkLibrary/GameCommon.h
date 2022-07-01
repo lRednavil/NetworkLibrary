@@ -12,7 +12,7 @@
 #define STATIC_KEY 0x32
 #define TCB_MAX 500
 
-#define SEND_PACKET_MAX 64
+#define SEND_PACKET_MAX 128
 #define TIMER_PRECISION 5
 
 #define PACKETPOOL_MAX 100

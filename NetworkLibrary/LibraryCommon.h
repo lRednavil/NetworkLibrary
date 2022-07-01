@@ -1,7 +1,7 @@
 #pragma once
 
 extern CTLSMemoryPool<CPacket> g_PacketPool;
-extern char ZeroField[4096];
+extern char ZeroField[2048];
 
 void MY_MEMORY_CLEAR(void* ptr, int size);
 

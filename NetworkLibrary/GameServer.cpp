@@ -432,7 +432,7 @@ bool CGameServer::NetInit(WCHAR* IP, DWORD port, bool isNagle)
 
     //setsockopt
     LINGER optval;
-    int sndSize = 0;
+    int sndSize = 65536;
 
     optval.l_linger = 0;
     optval.l_onoff = 1;
@@ -665,7 +665,7 @@ bool CGameServer::MakeSession(WCHAR* IP, SOCKET sock, DWORD64* ID)
     InterlockedAnd64((__int64*)&session->ioCnt, ~RELEASE_FLAG);
 
     //iocp match
-    h = CreateIoCompletionPort((HANDLE)session->sock, hIOCP, (ULONG_PTR)sessionID, 0);
+    h = CreateIoCompletionPort((HANDLE)session->sock, hIOCP, (ULONG_PTR)session, 0);
     if (h != hIOCP) {
         _FILE_LOG(LOG_LEVEL_ERROR, L"LibraryLog", L"IOCP to SOCKET Failed");
         //crash 용도
@@ -713,7 +713,7 @@ void CGameServer::ReleaseSession(SESSION* session)
 
     InterlockedDecrement(&sessionCnt);
 
-    PostQueuedCompletionStatus(hIOCP, 0, session->sessionID, (LPOVERLAPPED)OV_DISCONNECT);
+    PostQueuedCompletionStatus(hIOCP, 0, (ULONG_PTR)session, (LPOVERLAPPED)OV_DISCONNECT);
 }
 
 unsigned int __stdcall CGameServer::WorkProc(void* arg)
@@ -762,15 +762,13 @@ void CGameServer::_WorkProc()
 {
     int ret;
     int err;
-    DWORD ioCnt;
 
     DWORD bytes;
-    DWORD64 sessionID;
     SESSION* session;
     OVERLAPPEDEX* overlap = NULL;
 
     while (isServerOn) {
-        ret = GetQueuedCompletionStatus(hIOCP, &bytes, (PULONG_PTR)&sessionID, (LPOVERLAPPED*)&overlap, INFINITE);
+        ret = GetQueuedCompletionStatus(hIOCP, &bytes, (PULONG_PTR)&session, (LPOVERLAPPED*)&overlap, INFINITE);
 
         //gqcs is false and overlap is NULL
         //case totally failed
@@ -781,11 +779,6 @@ void CGameServer::_WorkProc()
             continue;
         }
 
-        session = FindSession(sessionID);
-
-        if (session == NULL) {
-            continue;
-        }
         //disconnect의 경우
         if ((__int64)overlap == OV_DISCONNECT) {
 			InterlockedDecrement16((short*)&session->belongClass->currentUser);
@@ -1079,7 +1072,7 @@ bool CGameServer::RecvPost(SESSION* session)
         }
     }
     else {
-        //_LOG(LOG_LEVEL_DEBUG, L"Recv In Time");
+        //recv synchronous
     }
 
     return true;
@@ -1093,6 +1086,7 @@ bool CGameServer::SendPost(SESSION* session)
     int sendCnt;
 
     CLockFreeQueue<CPacket*>* sendQ;
+    CPacket** sendBuf = session->sendBuf;
     CPacket* packet;
 
     WSABUF pBuf[SEND_PACKET_MAX];
@@ -1104,7 +1098,7 @@ bool CGameServer::SendPost(SESSION* session)
 
     for (cnt = 0; cnt < sendCnt; cnt++) {
         sendQ->Dequeue(&packet);
-        session->sendBuf[cnt] = packet;
+        sendBuf[cnt] = packet;
         pBuf[cnt].buf = packet->GetBufferPtr();
         pBuf[cnt].len = packet->GetDataSize();
     }
@@ -1140,6 +1134,7 @@ bool CGameServer::SendPost(SESSION* session)
     }
     else {
         //sent in time
+        InterlockedAdd64((__int64*)&totalSend, sendCnt);
     }
 
     return true;
