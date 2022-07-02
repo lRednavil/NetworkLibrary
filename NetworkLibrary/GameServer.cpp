@@ -20,7 +20,7 @@ struct SESSION {
     alignas(64)
         short isRecving;    
     alignas(64)
-        short isSending;
+        volatile bool isSending;
     alignas(64)
         char isMoving;
 
@@ -815,7 +815,7 @@ void CGameServer::_WorkProc()
                 PacketFree(sendBuf[sendCnt]);
             }
             
-            InterlockedDecrement16(&session->isSending);
+            session->isSending = false;
             //작업 완료에 대한 lose
             LoseSession(session);
         }
@@ -1057,7 +1057,7 @@ bool CGameServer::RecvPost(SESSION* session)
     pBuf[0] = { len, recvQ->GetRearBufferPtr() };
     pBuf[1] = { recvQ->GetFreeSize() - len, recvQ->GetBufferPtr() };
 
-    ret = WSARecv(InterlockedAdd64((__int64*)&session->sock, 0), pBuf, 2, NULL, &flag, (LPWSAOVERLAPPED)&session->recvOver, NULL);
+    ret = WSARecv(session->sock, pBuf, 2, NULL, &flag, (LPWSAOVERLAPPED)&session->recvOver, NULL);
 
     if (ret == SOCKET_ERROR) {
         err = WSAGetLastError();
@@ -1106,11 +1106,12 @@ bool CGameServer::SendPost(SESSION* session)
 
     WSABUF pBuf[SEND_PACKET_MAX];
 
-    if (InterlockedIncrement16(&session->isSending) != 1) {
-        InterlockedDecrement16(&session->isSending);
+    if (session->isSending) {
         LoseSession(session);
         return false;
     }
+
+    session->isSending = true;
 
     sendQ = &session->sendQ;
     sendCnt = min(sendQ->GetSize(), SEND_PACKET_MAX);
@@ -1124,7 +1125,7 @@ bool CGameServer::SendPost(SESSION* session)
         pBuf[cnt].len = packet->GetDataSize();
     }
 
-    ret = WSASend(InterlockedAdd64((__int64*)&session->sock, 0), pBuf, sendCnt, NULL, 0, (LPWSAOVERLAPPED)&session->sendOver, NULL);
+    ret = WSASend(session->sock, pBuf, sendCnt, NULL, 0, (LPWSAOVERLAPPED)&session->sendOver, NULL);
 
     if (ret == SOCKET_ERROR) {
         err = WSAGetLastError();
@@ -1149,7 +1150,7 @@ bool CGameServer::SendPost(SESSION* session)
             default:
                 _FILE_LOG(LOG_LEVEL_ERROR, L"LibraryLog", L"RecvPost Error %d", err);
             }
-            InterlockedDecrement16(&session->isSending);
+            session->isSending = false;
             LoseSession(session);
             return false;
         }
@@ -1246,7 +1247,7 @@ bool CGameServer::Disconnect(DWORD64 sessionID)
         return false;
     }
 
-    CancelIoEx((HANDLE)InterlockedOr64((__int64*)&session->sock, RELEASE_FLAG), NULL);
+    CancelIoEx((HANDLE)InterlockedExchange64((__int64*)&session->sock, RELEASE_FLAG), NULL);
 
     if (session->belongClass == g_defaultClass) {
         LoseSession(session);
