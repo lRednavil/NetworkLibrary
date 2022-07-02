@@ -18,7 +18,9 @@ struct SESSION {
     alignas(64)
         DWORD64 ioCnt;
     alignas(64)
-        short isRecving;
+        short isRecving;    
+    alignas(64)
+        short isSending;
     alignas(64)
         char isMoving;
 
@@ -160,6 +162,8 @@ void CUnitClass::SetTimeOut(DWORD64 sessionID, DWORD timeVal)
 CDefautClass* g_defaultClass;
 CUSTOM_TCB* g_defaultTCB;
 
+OVERLAPPEDEX g_disconnect_overlap;
+
 CGameServer::CGameServer()
 {
     int ret;
@@ -171,6 +175,9 @@ CGameServer::CGameServer()
     g_defaultTCB->classList = new CUnitClass*;
     g_defaultTCB->classList[0] = g_defaultClass;
     g_defaultTCB->hEvent = (HANDLE)CreateEvent(NULL, TRUE, FALSE, NULL);
+
+    //disconnect용 overlap구조체 설정
+    g_disconnect_overlap.type = OV_DISCONNECT;
 
     packetPool = NULL;
     g_defaultClass->isAwake = true;
@@ -423,7 +430,7 @@ bool CGameServer::NetInit(WCHAR* IP, DWORD port, bool isNagle)
     WSAStartup(MAKEWORD(2, 2), &wsa);
 
     //socket
-    listenSock = socket(AF_INET, SOCK_STREAM, NULL);
+    listenSock = WSASocket(AF_INET, SOCK_STREAM, NULL, NULL, 0, WSA_FLAG_OVERLAPPED);
     if (listenSock == INVALID_SOCKET) {
         err = WSAGetLastError();
         return false;
@@ -713,7 +720,7 @@ void CGameServer::ReleaseSession(SESSION* session)
 
     InterlockedDecrement(&sessionCnt);
 
-    PostQueuedCompletionStatus(hIOCP, 0, (ULONG_PTR)session, (LPOVERLAPPED)OV_DISCONNECT);
+    PostQueuedCompletionStatus(hIOCP, 0, (ULONG_PTR)session, (LPOVERLAPPED)&g_disconnect_overlap);
 }
 
 unsigned int __stdcall CGameServer::WorkProc(void* arg)
@@ -779,31 +786,27 @@ void CGameServer::_WorkProc()
             continue;
         }
 
-        //disconnect의 경우
-        if ((__int64)overlap == OV_DISCONNECT) {
-			InterlockedDecrement16((short*)&session->belongClass->currentUser);
-			sessionStack.Push(session->sessionID >> MASK_SHIFT);
-            continue;
-        }
-
         //recvd
-        if (overlap->type == OV_RECV) {
-            if (ret == false || bytes == 0) {
-                LoseSession(session);
-                InterlockedDecrement16(&session->isRecving);
-            }
-            else
-            {
-                session->recvQ.MoveRear(bytes);
-                InterlockedDecrement16(&session->isRecving);
-                RecvProc(session);
-                //스레드 깨우기용 이벤트 설정
-                SetEvent(session->belongThread->hEvent);
-            }
+        switch (overlap->type) {
+        case OV_RECV:
+        {
+			if (ret == false || bytes == 0) {
+				LoseSession(session);
+				InterlockedDecrement16(&session->isRecving);
+			}
+			else
+			{
+				session->recvQ.MoveRear(bytes);
+				InterlockedDecrement16(&session->isRecving);
+				RecvProc(session);
+				//스레드 깨우기용 이벤트 설정
+				SetEvent(session->belongThread->hEvent);
+			}
         }
-        //sent
-        if (overlap->type == OV_SEND) {
-            DWORD sendCnt = session->sendCnt;
+        break;
+        case OV_SEND:
+        {
+            int sendCnt = session->sendCnt;
             CPacket** sendBuf = session->sendBuf;
             session->sendCnt = 0;
 
@@ -811,9 +814,20 @@ void CGameServer::_WorkProc()
                 --sendCnt;
                 PacketFree(sendBuf[sendCnt]);
             }
+            
+            InterlockedDecrement16(&session->isSending);
             //작업 완료에 대한 lose
             LoseSession(session);
         }
+        break;
+        case OV_DISCONNECT:
+        {
+            InterlockedDecrement16((short*)&session->belongClass->currentUser);
+            sessionStack.Push(session->sessionID >> MASK_SHIFT);
+        }
+        break;
+        }
+
 
     }
 
@@ -895,6 +909,7 @@ void CGameServer::_SendThread()
     DWORD64 sessionID;
     while (isServerOn) {
         for(cnt = 0; cnt < maxConnection; cnt++){
+            if (sessionArr[cnt].sendQ.GetSize() == 0) continue;
             session = AcquireSession(sessionArr[cnt].sessionID);
 
             if (session != NULL) {
@@ -954,9 +969,9 @@ void CGameServer::RecvProc(SESSION* session)
 	WCHAR errText[100];
 
 	session->lastTime = currentTime;
-
+    
+    len = recvQ->GetUsedSize();
 	for (;;) {
-		len = recvQ->GetUsedSize();
 		//길이 판별
 		if (sizeof(packetHeader) > len) {
 			break;
@@ -981,7 +996,7 @@ void CGameServer::RecvProc(SESSION* session)
         packet = PacketAlloc();
 
 		//헤더영역 dequeue
-		recvQ->Dequeue((char*)packet->GetBufferPtr(), sizeof(packetHeader) + packetHeader.len);
+		len -= recvQ->Dequeue((char*)packet->GetBufferPtr(), sizeof(packetHeader) + packetHeader.len);
 		packet->MoveWritePos(packetHeader.len);
 
 		if (packetHeader.staticCode != STATIC_CODE) {
@@ -1091,6 +1106,12 @@ bool CGameServer::SendPost(SESSION* session)
 
     WSABUF pBuf[SEND_PACKET_MAX];
 
+    if (InterlockedIncrement16(&session->isSending) != 1) {
+        InterlockedDecrement16(&session->isSending);
+        LoseSession(session);
+        return false;
+    }
+
     sendQ = &session->sendQ;
     sendCnt = min(sendQ->GetSize(), SEND_PACKET_MAX);
     session->sendCnt = sendCnt;
@@ -1103,7 +1124,7 @@ bool CGameServer::SendPost(SESSION* session)
         pBuf[cnt].len = packet->GetDataSize();
     }
 
-    ret = WSASend(InterlockedOr64((__int64*)&session->sock, 0), pBuf, sendCnt, NULL, 0, (LPWSAOVERLAPPED)&session->sendOver, NULL);
+    ret = WSASend(InterlockedAdd64((__int64*)&session->sock, 0), pBuf, sendCnt, NULL, 0, (LPWSAOVERLAPPED)&session->sendOver, NULL);
 
     if (ret == SOCKET_ERROR) {
         err = WSAGetLastError();
@@ -1128,6 +1149,7 @@ bool CGameServer::SendPost(SESSION* session)
             default:
                 _FILE_LOG(LOG_LEVEL_ERROR, L"LibraryLog", L"RecvPost Error %d", err);
             }
+            InterlockedDecrement16(&session->isSending);
             LoseSession(session);
             return false;
         }
