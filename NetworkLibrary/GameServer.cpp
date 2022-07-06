@@ -446,6 +446,11 @@ bool CGameServer::ThreadInit(const DWORD createThreads, const DWORD runningThrea
 
 void CGameServer::NetClose()
 {
+    closesocket(listenSock);
+
+    for (int idx = 0; idx < maxConnection; idx++) {
+        Disconnect(sessionArr[idx].sessionID);
+    }
 }
 
 void CGameServer::ThreadClose()
@@ -1128,9 +1133,6 @@ bool CGameServer::Start(WCHAR* IP, DWORD port, DWORD createThreads, DWORD runnin
         sessionStack.Push(cnt);
     }
 
-    myMonitor = new CProcessMonitor;
-    totalMonitor = new CProcessorMonitor;
-
     if (ThreadInit(createThreads, runningThreads) == false) {
         isServerOn = false;
         sessionStack.~CLockFreeStack();
@@ -1146,9 +1148,13 @@ void CGameServer::Stop()
 
     isServerOn = false;
 
+    NetClose();
+
     ThreadClose();
 
-    NetClose();
+    delete packetPool;
+    delete sessionArr;
+    delete hThreads;
 }
 
 int CGameServer::GetSessionCount()

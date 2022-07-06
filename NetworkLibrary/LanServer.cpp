@@ -318,9 +318,9 @@ bool CLanServer::MakeSession(WCHAR* IP, SOCKET sock, DWORD64* ID)
     session->sessionID = *ID = sessionID;
 
     MEMORY_CLEAR(&session->recvOver, sizeof(session->recvOver));
-    session->recvOver.type = 0;
+    session->recvOver.type = OV_RECV;
     MEMORY_CLEAR(&session->sendOver, sizeof(session->sendOver));
-    session->sendOver.type = 1;
+    session->sendOver.type = OV_SEND_FIN;
 
     //recv¿ë ioCountÁõ°¡
     InterlockedIncrement(&session->ioCnt);

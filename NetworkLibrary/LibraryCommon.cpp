@@ -2,6 +2,10 @@
 #include "LibraryCommon.h"
 #include "TLSMemoryPool.h"
 
+OVERLAPPEDEX g_disconnect_overlap = { {}, OV_DISCONNECT };
+OVERLAPPEDEX g_sendReq_overlap = { {}, OV_SEND_REQ };
+OVERLAPPEDEX g_serverEnd_overlap = { {}, OV_SERVER_END };
+
 CTLSMemoryPool<CPacket> g_PacketPool;
 char ZeroField[2048] = {0,};
 

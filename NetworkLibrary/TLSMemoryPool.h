@@ -1,5 +1,6 @@
 #pragma once
 #include "LockFreeMemoryPool.h"
+#include "LockFreeStack.h"
 
 template <class DATA>
 struct CHUNKNODE {
@@ -39,8 +40,8 @@ private:
 	CLockFreeMemoryPool<CHUNK<DATA>>* chunkPool;
 	DWORD tlsID;
 	int chunkSize;
-	
-	
+	//소멸자에서 모든 chunk 해제용
+	CLockFreeStack<CHUNK<DATA>*>* chunkStack;
 	//write field
 	alignas(64)
 	int capacity;
@@ -61,12 +62,21 @@ inline CTLSMemoryPool<DATA>::CTLSMemoryPool(int chunkSize, bool newCall) : chunk
 	allocTry = 0;
 
 	chunkPool = new CLockFreeMemoryPool<CHUNK<DATA>>;
+	chunkStack = new CLockFreeStack<CHUNK<DATA>*>;
 }
 
 template<class DATA>
 inline CTLSMemoryPool<DATA>::~CTLSMemoryPool()
 {
+	CHUNK<DATA>* chunk = NULL;
 	TlsFree(tlsID);
+	while(chunkStack->Pop(&chunk)){
+		delete[] chunk->arr;
+		if(chunk->freeCount != 0)
+			chunkPool->Free(chunk);
+	}
+	delete chunkPool;
+	delete chunkStack;
 }
 
 template<class DATA>
@@ -115,6 +125,7 @@ inline CHUNK<DATA>* CTLSMemoryPool<DATA>::ChunkAlloc()
 		for (int arrCnt = 0; arrCnt < chunkSize; arrCnt++) {
 			chunk->arr[arrCnt].pChunk = chunk;
 		}
+		chunkStack->Push(chunk);
 	}
 
 	return chunk;

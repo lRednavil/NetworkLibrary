@@ -89,10 +89,14 @@ void CNetServer::Stop()
 	OnStop();
 
 	isServerOn = false;
+	
+	NetClose();
 
 	ThreadClose();
 	
-	NetClose();
+	delete packetPool;
+	delete sessionArr;
+	delete hThreads;
 }
 
 int CNetServer::GetSessionCount()
@@ -387,9 +391,11 @@ bool CNetServer::ThreadInit(const DWORD createThreads, const DWORD runningThread
 
 void CNetServer::NetClose()
 {
+	closesocket(listenSock);
 
-
-	delete packetPool;
+	for (int idx = 0; idx < maxConnection; idx++) {
+		Disconnect(sessionArr[idx].sessionID);
+	}
 }
 
 void CNetServer::ThreadClose()
