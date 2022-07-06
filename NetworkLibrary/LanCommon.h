@@ -14,11 +14,6 @@ class CMemoryPool;
 
 constexpr int WSABUFSIZE = sizeof(WSABUF) * SEND_PACKET_MAX;
 
-struct OVERLAPPEDEX {
-	OVERLAPPED overlap;
-	WORD type;
-};
-
 #pragma pack(push, 1)
 struct LAN_HEADER {
 	WORD len;

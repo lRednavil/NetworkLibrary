@@ -17,17 +17,6 @@
 
 #define PACKETPOOL_MAX 100
 
-enum OVERLAP_ENUM {
-	OV_RECV = 0,
-	OV_SEND = 1,
-	OV_DISCONNECT = 2,
-};
-
-struct OVERLAPPEDEX {
-	OVERLAPPED overlap;
-	WORD type;
-};
-
 #pragma pack(push, 1)
 struct GAME_PACKET_HEADER {
 	BYTE staticCode;

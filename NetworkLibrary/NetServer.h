@@ -7,9 +7,18 @@ class CProcessorMonitor;
 
 class CNetServer
 {
+protected:
+	enum NETMODE {
+		MODE_DEBUG,
+		MODE_WHITELIST,
+		MODE_PUBLISH
+	};
 public:
+	CNetServer();
+	virtual ~CNetServer();
+
 	//오픈 IP / 포트 / 워커스레드 수(생성수, 러닝수) / 나글옵션 / 최대접속자 수
-	bool Start(const WCHAR * IP, DWORD port, DWORD createThreads, DWORD runningThreads, bool isNagle, DWORD maxConnect, DWORD snapLatency, int packetSize = CPacket::eBUFFER_DEFAULT);
+	bool Start(const WCHAR * IP, DWORD port, DWORD createThreads, DWORD runningThreads, bool isNagle, DWORD maxConnect, int packetSize = CPacket::eBUFFER_DEFAULT);
 	void Stop();
 
 	int GetSessionCount();
@@ -18,9 +27,6 @@ public:
 	bool SendPacket(DWORD64 sessionID, CPacket* packet);
 	//접속자 전원에게 send
 	void SendPacketToAll(CPacket* packet);
-	//가볍게 enq만 할 경우
-	bool SendEnQ(DWORD64 sessionID, CPacket* packet);
-	bool SendAndDisconnect(DWORD64 sessionID, CPacket* packet);
 	bool SendAndDisconnect(DWORD64 sessionID, CPacket* packet, DWORD timeOutVal);
 
 	//기본 참조카운트 1부여 및 초기화 실행
@@ -30,6 +36,7 @@ public:
 	int		GetPacketPoolUse();
 
 	void SetTimeOut(DWORD64 sessionID, DWORD timeVal, bool recvTimeReset = false);
+	void SetNetMode(NETMODE mode);
 
 	DWORD64 GetTotalAccept();
 	DWORD64 GetAcceptTPS();
@@ -47,14 +54,14 @@ public:
 	//메세지 헤더는 알아서 검증할 것
 	virtual void OnRecv(DWORD64 sessionID, CPacket* packet) = 0;
 
-	virtual void OnTimeOut(DWORD64 sessionID, int reason) = 0;
+	virtual void OnTimeOut(DWORD64 sessionID) = 0;
 
 	virtual void OnError(int error, const WCHAR* msg) = 0;
 
 	//종료함수 작성용
 	virtual void OnStop() = 0;
-private:
 
+private:
 	bool NetInit(const WCHAR * IP, DWORD port, bool isNagle);
 	bool ThreadInit(const DWORD createThreads, const DWORD runningThreads);
 
@@ -85,50 +92,44 @@ private:
 	static unsigned int __stdcall WorkProc(void* arg);
 	static unsigned int __stdcall AcceptProc(void* arg);
 	static unsigned int __stdcall TimerProc(void* arg);
-	static unsigned int __stdcall SendProc(void* arg);
 	void _WorkProc();
 	void _AcceptProc();
 	void _TimerProc();
-	void _SendProc();
 
 	void RecvProc(SESSION* session);
 	bool RecvPost(SESSION* session);
 	bool SendPost(SESSION* session);
 
 protected:
-	//sessionID 겸용
+	BYTE netMode; // << 나중에 화이트리스트 모드 등등 변경용
+	//시간 기억
+	DWORD currentTime; 
+	alignas(64)
+		//sessionID 겸용
 	DWORD64 totalAccept = 0;
 	//tps측정용 기억
 	DWORD64 lastAccept = 0;
-
-	//시간 기억
-	DWORD currentTime;
 
 private:
 	//array for session
 	SESSION* sessionArr;
 	//stack for session index
 	CLockFreeStack<int> sessionStack;
-	CLockFreeQueue<DWORD64> sendSessionQ;
 
 	//monitor
 	DWORD sessionCnt;
 	DWORD maxConnection;
-	BYTE netMode; // << 나중에 화이트리스트 모드 등등 변경용
 	bool isServerOn;
 
-	CProcessMonitor* myMonitor;
-	CProcessorMonitor* totalMonitor;
-
 	//readonly
-	LPFN_TRANSMITPACKETS transFn;
+	SOCKET listenSock;
+	HANDLE hIOCP;
 	CTLSMemoryPool<CPacket>* packetPool;
 	int packetSize;
-	SOCKET listenSock;
-	DWORD snapLatency;
-	HANDLE hIOCP;
-	int threadCnt;
 
+	HANDLE hAccept;
+	HANDLE hTimer;
 	HANDLE* hThreads;
+	int threadCnt;
 };
 
