@@ -296,7 +296,7 @@ bool CNetServer::NetInit(const WCHAR* IP, DWORD port, bool isNagle)
 
 	//setsockopt
 	LINGER optval;
-	int sndSize = 0;
+	int sndSize = 65536;
 
 	optval.l_linger = 0;
 	optval.l_onoff = 1;
@@ -405,6 +405,12 @@ void CNetServer::ThreadClose()
 	WaitForSingleObject(hAccept, INFINITE);
 	WaitForSingleObject(hTimer, INFINITE);
 	WaitForMultipleObjects(threadCnt, hThreads, true, INFINITE);
+
+	CloseHandle(hAccept);
+	CloseHandle(hTimer);
+	for (int idx = 0; idx < threadCnt; idx++) {
+		CloseHandle(hThreads[idx]);
+	}
 }
 
 SESSION* CNetServer::AcquireSession(DWORD64 sessionID)
@@ -476,12 +482,8 @@ bool CNetServer::MakeSession(WCHAR* IP, SOCKET sock, DWORD64* ID)
 
 	session->lastTime = currentTime;
 
-	//recv용 ioCount증가
-	InterlockedIncrement(&session->ioCnt);
-	InterlockedAnd64((__int64*)&session->ioCnt, ~RELEASE_FLAG);
-
 	//iocp match
-	h = CreateIoCompletionPort((HANDLE)session->sock, hIOCP, (ULONG_PTR)sessionID, 0);
+	h = CreateIoCompletionPort((HANDLE)session->sock, hIOCP, (ULONG_PTR)session, 0);
 	if (h != hIOCP) {
 		_FILE_LOG(LOG_LEVEL_ERROR, L"LibraryLog", L"IOCP to SOCKET Failed");
 		OnError(-1, L"IOCP to SOCKET Failed");
@@ -490,6 +492,9 @@ bool CNetServer::MakeSession(WCHAR* IP, SOCKET sock, DWORD64* ID)
 		return false;
 	}
 
+	//recv용 ioCount증가
+	InterlockedIncrement(&session->ioCnt);
+	InterlockedAnd64((__int64*)&session->ioCnt, ~RELEASE_FLAG);
 
 	return true;
 }
@@ -521,12 +526,12 @@ void CNetServer::ReleaseSession(SESSION* session)
 		PacketFree(packet);
 	}
 
+	session->isSending = false;
 	session->recvQ.ClearBuffer();
 
-	session->isSending = 0;
 	InterlockedDecrement(&sessionCnt);
 
-	PostQueuedCompletionStatus(hIOCP, 0, session->sessionID, (LPOVERLAPPED)2);
+	PostQueuedCompletionStatus(hIOCP, 0, (ULONG_PTR)session, (LPOVERLAPPED)&g_disconnect_overlap);
 	
 }
 
@@ -793,7 +798,7 @@ bool CNetServer::RecvPost(SESSION* session)
 	pBuf[0] = { len, recvQ->GetRearBufferPtr() };
 	pBuf[1] = { recvQ->GetFreeSize() - len, recvQ->GetBufferPtr() };
 
-	ret = WSARecv(InterlockedAdd64((__int64*)&session->sock, 0), pBuf, 2, NULL, &flag, (LPWSAOVERLAPPED)&session->recvOver, NULL);
+	ret = WSARecv(session->sock, pBuf, 2, NULL, &flag, (LPWSAOVERLAPPED)&session->recvOver, NULL);
 
 	if (ret == SOCKET_ERROR) {
 		err = WSAGetLastError();
@@ -844,6 +849,10 @@ bool CNetServer::SendPost(SESSION* session)
 
 	sendQ = &session->sendQ;
 	sendCnt = min(sendQ->GetSize(), SEND_PACKET_MAX);
+	if (session->sendCnt > 0) {
+		CRASH();
+	}
+
 	session->sendCnt = sendCnt;
 	MEMORY_CLEAR(pBuf, sizeof(WSABUF) * SEND_PACKET_MAX);
 
@@ -876,10 +885,9 @@ bool CNetServer::SendPost(SESSION* session)
 			case 10064:
 				break;
 			default:
-				_FILE_LOG(LOG_LEVEL_ERROR, L"LibraryLog", L"RecvPost Error %d", err);
+				_FILE_LOG(LOG_LEVEL_ERROR, L"LibraryLog", L"SendPost Error %d", err);
 				OnError(err, L"SendPost Error");
 			}
-			session->isSending = false;
 			LoseSession(session);
 			return false;
 		}

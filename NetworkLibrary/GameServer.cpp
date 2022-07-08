@@ -20,7 +20,7 @@ struct SESSION {
     alignas(64)
         short isRecving;    
     alignas(64)
-        volatile bool isSending;
+        bool isSending;
     alignas(64)
         char isMoving;
 
@@ -72,6 +72,8 @@ class CDefautClass : public CUnitClass {
     virtual void OnTimeOut(DWORD64 sessionID) {};
 
     virtual void OnError(int error, const WCHAR* msg) {};
+    
+    virtual void OnEnd() {};
 
     //gameserver용
     //jobQ에 EnQ된 메세지들 처리
@@ -93,10 +95,9 @@ CUnitClass::~CUnitClass()
     delete leaveQ;
     delete disconnectQ;
 }
-void CUnitClass::InitClass(WORD targetFrame, BYTE endOpt, WORD maxUser)
+void CUnitClass::InitClass(WORD targetFrame, WORD maxUser)
 {
     frameDelay = 1000 / targetFrame;
-    endOption = endOpt;
     this->maxUser = maxUser;
 }
 
@@ -309,7 +310,7 @@ void CGameServer::AttatchClass(const WCHAR* tagName, CUnitClass* const classPtr,
             continue;
 
         unitIdx = InterlockedIncrement16((short*)&tcbArray[cnt].currentUnits) - 1;
-        if (unitIdx >= tcbArray[cnt].max_class_unit) {
+        if (unitIdx > tcbArray[cnt].max_class_unit) {
             InterlockedDecrement16((short*)&tcbArray[cnt].currentUnits);
             continue;
         }
@@ -651,6 +652,7 @@ void CGameServer::ReleaseSession(SESSION* session)
     }
     session->sendCnt = 0;
 
+    session->isSending = false;
     session->recvQ.ClearBuffer();
 
     info.packet = NULL;
@@ -692,6 +694,8 @@ unsigned int __stdcall CGameServer::UnitProc(void* arg)
     CGameServer* server = info->thisPtr;
 
     server->_UnitProc(info->tcb);
+
+    delete arg;
 
     return 0;
 }
@@ -1065,7 +1069,6 @@ bool CGameServer::SendPost(SESSION* session)
             default:
                 _FILE_LOG(LOG_LEVEL_ERROR, L"LibraryLog", L"RecvPost Error %d", err);
             }
-            session->isSending = false;
             LoseSession(session);
             return false;
         }
@@ -1102,9 +1105,7 @@ void CGameServer::UnitJoinLeaveProc(CUnitClass* unit)
     }
 
     if (unit->currentUser == 0) {
-        switch (unit->endOption) {
-            case 
-        }
+        
     }
 }
 

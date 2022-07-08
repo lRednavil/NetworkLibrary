@@ -15,17 +15,10 @@ class CUnitClass{
 	friend class CGameServer;
 
 public:
-	enum END_OPTION {
-		OPT_DESTROY,
-		OPT_STOP,
-		OPT_RESET
-	};
-
-public:
 	CUnitClass();
 	virtual ~CUnitClass();
 
-	void InitClass(WORD targetFrame, BYTE endOpt, WORD maxUser);
+	void InitClass(WORD targetFrame, WORD maxUser);
 	
 	//server참조 함수들
 	
@@ -62,11 +55,14 @@ public:
 
 	virtual void OnError(int error, const WCHAR* msg) = 0;
 
+	
 	//gameserver용
 	//jobQ에 EnQ된 메세지들 처리
 	virtual void MsgUpdate() = 0;
 	//frame단위의 업데이트 처리
 	virtual void FrameUpdate() = 0;
+
+	virtual void OnEnd() = 0;
 
 private:
 	//classInfos
@@ -81,7 +77,6 @@ private:
 	CLockFreeQueue<MOVE_INFO>* leaveQ;
 	CLockFreeQueue<MOVE_INFO>* disconnectQ;
 	WORD frameDelay; //1초 / targetFrame
-	BYTE endOption;
 	CGameServer* server = nullptr;
 };
 
