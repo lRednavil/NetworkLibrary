@@ -1136,7 +1136,6 @@ bool CGameServer::Start(WCHAR* IP, DWORD port, DWORD createThreads, DWORD runnin
 
     if (ThreadInit(createThreads, runningThreads) == false) {
         isServerOn = false;
-        sessionStack.~CLockFreeStack();
         return false;
     }
 

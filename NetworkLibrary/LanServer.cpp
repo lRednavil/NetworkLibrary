@@ -10,7 +10,7 @@ struct SESSION {
     alignas(64)
         DWORD64 ioCnt;
     alignas(64)
-        short isSending;
+        bool isSending;
     //send 후 해제용
     CPacket* sendBuf[SEND_PACKET_MAX];
     //monitor
@@ -63,7 +63,6 @@ bool CLanServer::Start(const WCHAR * IP, DWORD port, DWORD createThreads, DWORD 
 
     if (ThreadInit(createThreads, runningThreads) == false) {
         isServerOn = false;
-        sessionStack.~CLockFreeStack();
         return false;
     }
 
@@ -106,14 +105,15 @@ bool CLanServer::SendPacket(DWORD64 sessionID, CPacket* packet)
         return false;
     }
 
-    HeaderAlloc(packet);
     session->sendQ.Enqueue(packet);
-    if (session->isSending == 0) {
-        SendPost(session);
+
+    if (InterlockedExchange8((char*)&session->isSending, true) == false) {
+        PostQueuedCompletionStatus(hIOCP, 0, (ULONG_PTR)session, (LPOVERLAPPED)&g_sendReq_overlap);
     }
     else {
         LoseSession(session);
     }
+
     return true;
 }
 
@@ -236,15 +236,14 @@ bool CLanServer::ThreadInit(const DWORD createThreads, const DWORD runningThread
     _LOG(LOG_LEVEL_SYSTEM, L"LanServer IOCP Created");
 
     //add 1 for accept thread
-    hThreads = new HANDLE[createThreads + ACCEPT_THREAD];
+    hAccept = (HANDLE)_beginthreadex(NULL, 0, CLanServer::AcceptProc, this, NULL, NULL);
+    hThreads = new HANDLE[createThreads];
 
-    hThreads[0] = (HANDLE)_beginthreadex(NULL, 0, CLanServer::AcceptProc, this, NULL, NULL);
-
-    for (cnt = ACCEPT_THREAD; cnt < createThreads + ACCEPT_THREAD; cnt++) {
+    for (cnt = 0; cnt < createThreads ; cnt++) {
         hThreads[cnt] = (HANDLE)_beginthreadex(NULL, 0, CLanServer::WorkProc, this, NULL, NULL);
     }
 
-    for (cnt = 0; cnt <= createThreads; cnt++) {
+    for (cnt = 0; cnt < createThreads; cnt++) {
         if (hThreads[cnt] == INVALID_HANDLE_VALUE) {
             OnError(-1, L"Create Thread Failed");
             return false;
@@ -368,7 +367,7 @@ void CLanServer::ReleaseSession(SESSION* session)
 
     session->recvQ.ClearBuffer();
 
-    session->isSending = 0;
+    session->isSending = false;
     InterlockedDecrement(&sessionCnt);
 
     sessionStack.Push(session->sessionID >> MASK_SHIFT);
@@ -401,8 +400,8 @@ void CLanServer::_WorkProc()
     SESSION* session;
     OVERLAPPEDEX* overlap = NULL;
 
-    while(isServerOn) {
-        ret = GetQueuedCompletionStatus(hIOCP, &bytes, (PULONG_PTR)&sessionID, (LPOVERLAPPED*)&overlap, INFINITE);
+    for (;;) {
+        ret = GetQueuedCompletionStatus(hIOCP, &bytes, (PULONG_PTR)&session, (LPOVERLAPPED*)&overlap, INFINITE);
 
         //gqcs is false and overlap is NULL
         //case totally failed
@@ -410,16 +409,13 @@ void CLanServer::_WorkProc()
             err = WSAGetLastError();
             _FILE_LOG(LOG_LEVEL_ERROR, L"LibraryLog", L"GQCS return NULL ovelap");
             OnError(err, L"GQCS return NULL ovelap");
+
             continue;
         }
 
-        session = FindSession(sessionID);
-
-        if (session == NULL) {
-            continue;
-        }
-        //recvd
-        if (overlap->type == 0) {
+        switch (overlap->type) {
+        case OV_RECV:
+        {
             if (ret == false || bytes == 0) {
                 LoseSession(session);
             }
@@ -428,11 +424,11 @@ void CLanServer::_WorkProc()
                 session->recvQ.MoveRear(bytes);
                 RecvProc(session);
             }
-
         }
-        //sent
-        if (overlap->type == 1) {
-            DWORD sendCnt = session->sendCnt;
+        break;
+        case OV_SEND_FIN:
+        {
+            int sendCnt = session->sendCnt;
             CPacket** sendBuf = session->sendBuf;
             session->sendCnt = 0;
 
@@ -441,18 +437,35 @@ void CLanServer::_WorkProc()
                 PacketFree(sendBuf[sendCnt]);
             }
 
-            InterlockedDecrement16(&session->isSending);
-
-            if (ret != false) {
-                if (session->sendQ.GetSize() != 0) {
-                    //추가로 send에 맞춘 acquire
-                    AcquireSession(sessionID);
-                    SendPost(session);
-                }
+            if (session->sendQ.GetSize() > 0) {
+                SendPost(session);
             }
-            //작업 완료에 대한 lose
-            LoseSession(session);
+            else {
+                InterlockedExchange8((char*)&session->isSending, false);
+                //작업 완료에 대한 lose
+                LoseSession(session);
+            }
         }
+        break;
+        case OV_DISCONNECT:
+        {
+            OnClientLeave(session->sessionID);
+            sessionStack.Push(session->sessionID >> MASK_SHIFT);
+        }
+        break;
+        case OV_SEND_REQ:
+        {
+            SendPost(session);
+        }
+        break;
+        case OV_SERVER_END:
+        {
+            PostQueuedCompletionStatus(hIOCP, 0, 0, (LPOVERLAPPED)&g_serverEnd_overlap);
+            return;
+        }
+        break;
+        }
+
 
     }
 
@@ -594,12 +607,6 @@ bool CLanServer::SendPost(SESSION* session)
     CPacket* packet;
 
     WSABUF pBuf[SEND_PACKET_MAX];
-    
-    //다른 SendPost진행중인지 확인용
-    if (InterlockedIncrement16(&session->isSending) != 1) {
-        LoseSession(session);
-        return false;
-    }
 
     sendQ = &session->sendQ;
     sendCnt = sendQ->GetSize();

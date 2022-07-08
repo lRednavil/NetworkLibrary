@@ -77,7 +77,6 @@ bool CNetServer::Start(const WCHAR * IP, DWORD port, DWORD createThreads, DWORD 
 
 	if (ThreadInit(createThreads, runningThreads) == false) {
 		isServerOn = false;
-		sessionStack.~CLockFreeStack();
 		return false;
 	}
 

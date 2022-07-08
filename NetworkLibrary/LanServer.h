@@ -90,6 +90,7 @@ private:
 	SOCKET listenSock;
 	HANDLE hIOCP;
 
+	HANDLE hAccept;
 	HANDLE* hThreads;
 };
 
