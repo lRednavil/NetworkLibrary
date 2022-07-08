@@ -848,10 +848,6 @@ bool CNetServer::SendPost(SESSION* session)
 
 	sendQ = &session->sendQ;
 	sendCnt = min(sendQ->GetSize(), SEND_PACKET_MAX);
-	if (session->sendCnt > 0) {
-		CRASH();
-	}
-
 	session->sendCnt = sendCnt;
 	MEMORY_CLEAR(pBuf, sizeof(WSABUF) * SEND_PACKET_MAX);
 
