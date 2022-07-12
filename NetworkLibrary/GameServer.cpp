@@ -1062,7 +1062,7 @@ bool CGameServer::SendPost(SESSION* session)
         }
         else {
             switch (err) {
-            /*case 10004:
+            case 10004:
             case 10022:
             case 10038:
             case 10053:
@@ -1072,7 +1072,7 @@ bool CGameServer::SendPost(SESSION* session)
             case 10060:
             case 10061:
             case 10064:
-                break;*/
+                break;
             default:
                 _FILE_LOG(LOG_LEVEL_ERROR, L"LibraryLog", L"SendPost Error %d || sock %llu || sendCnt %d", err, session->sock, sendCnt);
             }
