@@ -470,6 +470,7 @@ bool CNetServer::MakeSession(WCHAR* IP, SOCKET sock, DWORD64* ID)
 	session = &sessionArr[sessionID_high];
 
 	session->sock = sock;
+	session->isSending = false;
 
 	wmemmove_s(session->IP, 16, IP, 16);
 	session->sessionID = *ID = sessionID;
@@ -525,7 +526,6 @@ void CNetServer::ReleaseSession(SESSION* session)
 		PacketFree(packet);
 	}
 
-	session->isSending = false;
 	session->recvQ.ClearBuffer();
 
 	InterlockedDecrement(&sessionCnt);
@@ -605,12 +605,17 @@ void CNetServer::_WorkProc()
 				PacketFree(sendBuf[sendCnt]);
 			}
 
+			InterlockedExchange8((char*)&session->isSending, false);
+
 			if (session->sendQ.GetSize() > 0) {
-				SendPost(session);
+				if (InterlockedExchange8((char*)&session->isSending, true) == false) {
+					SendPost(session);
+				}
+				else {
+					LoseSession(session);
+				}
 			}
 			else {
-				InterlockedExchange8((char*)&session->isSending, false);
-				//작업 완료에 대한 lose
 				LoseSession(session);
 			}
 		}
@@ -692,6 +697,7 @@ void CNetServer::_TimerProc()
 		currentTime = timeGetTime();
 
 		for (cnt = 0; cnt < maxConnection; ++cnt) {
+			_mm_lfence();
 			session = &sessionArr[cnt];
 
 			if (session->ioCnt & RELEASE_FLAG) continue;
@@ -838,7 +844,7 @@ bool CNetServer::SendPost(SESSION* session)
 	int ret;
 	int err;
 	WORD cnt;
-	int sendCnt;
+	int sendCnt = 0;
 
 	CLockFreeQueue<CPacket*>* sendQ;
 	CPacket** sendBuf = session->sendBuf;
@@ -847,6 +853,9 @@ bool CNetServer::SendPost(SESSION* session)
 	WSABUF pBuf[SEND_PACKET_MAX];
 
 	sendQ = &session->sendQ;
+	while (sendCnt == 0) {
+		sendCnt = sendQ->GetSize();
+	}
 	sendCnt = min(sendQ->GetSize(), SEND_PACKET_MAX);
 	session->sendCnt = sendCnt;
 	MEMORY_CLEAR(pBuf, sizeof(WSABUF) * SEND_PACKET_MAX);
@@ -880,6 +889,7 @@ bool CNetServer::SendPost(SESSION* session)
 			case 10064:
 				break;
 			default:
+				InterlockedExchange8((char*)&session->isSending, false);
 				_FILE_LOG(LOG_LEVEL_ERROR, L"LibraryLog", L"SendPost Error %d", err);
 				OnError(err, L"SendPost Error");
 			}

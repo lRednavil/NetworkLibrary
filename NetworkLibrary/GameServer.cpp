@@ -310,7 +310,7 @@ void CGameServer::AttatchClass(const WCHAR* tagName, CUnitClass* const classPtr,
             continue;
 
         unitIdx = InterlockedIncrement16((short*)&tcbArray[cnt].currentUnits) - 1;
-        if (unitIdx > tcbArray[cnt].max_class_unit) {
+        if (unitIdx >= tcbArray[cnt].max_class_unit) {
             InterlockedDecrement16((short*)&tcbArray[cnt].currentUnits);
             continue;
         }
@@ -652,7 +652,6 @@ void CGameServer::ReleaseSession(SESSION* session)
     }
     session->sendCnt = 0;
 
-    session->isSending = false;
     session->recvQ.ClearBuffer();
 
     info.packet = NULL;
@@ -749,12 +748,17 @@ void CGameServer::_WorkProc()
                 PacketFree(sendBuf[sendCnt]);
             }
             
+            InterlockedExchange8((char*)&session->isSending, false);
+            
             if (session->sendQ.GetSize() > 0) {
-                SendPost(session);
+                if (InterlockedExchange8((char*)&session->isSending, true) == false) {
+                    SendPost(session);
+                }
+                else {
+                    LoseSession(session);
+                }
             }
             else {
-                InterlockedExchange8((char*)&session->isSending, false);
-                //작업 완료에 대한 lose
                 LoseSession(session);
             }
         }
@@ -1024,7 +1028,7 @@ bool CGameServer::SendPost(SESSION* session)
     int ret;
     int err;
     WORD cnt;
-    int sendCnt;
+    int sendCnt = 0;
 
     CLockFreeQueue<CPacket*>* sendQ;
     CPacket** sendBuf = session->sendBuf;
@@ -1033,7 +1037,10 @@ bool CGameServer::SendPost(SESSION* session)
     WSABUF pBuf[SEND_PACKET_MAX];
 
     sendQ = &session->sendQ;
-    sendCnt = min(sendQ->GetSize(), SEND_PACKET_MAX);
+    while (sendCnt == 0) {
+        sendCnt = sendQ->GetSize();
+    }
+    sendCnt = min(sendCnt, SEND_PACKET_MAX);
     session->sendCnt = sendCnt;
     MEMORY_CLEAR(pBuf, sizeof(WSABUF) * SEND_PACKET_MAX);
 
@@ -1055,7 +1062,7 @@ bool CGameServer::SendPost(SESSION* session)
         }
         else {
             switch (err) {
-            case 10004:
+            /*case 10004:
             case 10022:
             case 10038:
             case 10053:
@@ -1065,10 +1072,11 @@ bool CGameServer::SendPost(SESSION* session)
             case 10060:
             case 10061:
             case 10064:
-                break;
+                break;*/
             default:
-                _FILE_LOG(LOG_LEVEL_ERROR, L"LibraryLog", L"RecvPost Error %d", err);
+                _FILE_LOG(LOG_LEVEL_ERROR, L"LibraryLog", L"SendPost Error %d || sock %llu || sendCnt %d", err, session->sock, sendCnt);
             }
+            InterlockedExchange8((char*)&session->isSending, false);
             LoseSession(session);
             return false;
         }
@@ -1194,8 +1202,13 @@ bool CGameServer::SendPacket(DWORD64 sessionID, CPacket* packet)
     }
     session->sendQ.Enqueue(packet);
 
-    if (InterlockedExchange8((char*)&session->isSending, true) == false) {
-        PostQueuedCompletionStatus(hIOCP, 0, (ULONG_PTR)session, (LPOVERLAPPED)&g_sendReq_overlap);
+    if (session->isSending == false) {
+        if (InterlockedExchange8((char*)&session->isSending, true) == false) {
+            PostQueuedCompletionStatus(hIOCP, 0, (ULONG_PTR)session, (LPOVERLAPPED)&g_sendReq_overlap);
+        }
+        else {
+            LoseSession(session);
+        }
     }
     else {
         LoseSession(session);
