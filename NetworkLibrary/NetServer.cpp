@@ -853,8 +853,10 @@ bool CNetServer::SendPost(SESSION* session)
 	WSABUF pBuf[SEND_PACKET_MAX];
 
 	sendQ = &session->sendQ;
-	while (sendCnt == 0) {
-		sendCnt = sendQ->GetSize();
+	if (sendCnt == 0) {
+		InterlockedExchange8((char*)&session->isSending, false);
+		LoseSession(session);
+		return false;
 	}
 	sendCnt = min(sendQ->GetSize(), SEND_PACKET_MAX);
 	session->sendCnt = sendCnt;
