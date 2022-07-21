@@ -148,7 +148,7 @@ int CUnitClass::GetPacketPoolUse()
 
 void CUnitClass::SetTimeOut(DWORD64 sessionID, DWORD timeVal)
 {
-    SetTimeOut(sessionID, timeVal);
+    server->SetTimeOut(sessionID, timeVal);
 }
 
 #pragma endregion
@@ -186,7 +186,7 @@ bool CGameServer::MoveClass(const WCHAR* tagName, DWORD64 sessionID, CPacket* pa
     CUSTOM_TCB* tcb = NULL;
     CUnitClass* destUnit = NULL;
     MOVE_INFO info;
-
+    
     if (session == NULL) {
         return false;
     }
@@ -243,11 +243,13 @@ END:
         //이동 클래스에 입장 입력
         session->belongClass->joinQ->Enqueue(info);
         SetEvent(session->belongThread->hEvent);
+
+        LoseSession(session);
+        return true;
     }
 
     LoseSession(session);
-
-    return destUnit == NULL;
+    return false;
 }
 
 bool CGameServer::FollowClass(DWORD64 targetID, DWORD64 followID, CPacket* packet)
@@ -601,7 +603,6 @@ bool CGameServer::MakeSession(WCHAR* IP, SOCKET sock, DWORD64* ID)
     session->recvOver.type = OV_RECV;
     ZeroMemory(&session->sendOver, sizeof(session->sendOver));
     session->sendOver.type = OV_SEND_FIN;
-
     session->lastTime = currentTime;
 
     session->belongClass = g_defaultClass;
@@ -723,14 +724,13 @@ void CGameServer::_WorkProc()
         switch (overlap->type) {
         case OV_RECV:
         {
+			InterlockedDecrement16(&session->isRecving);
 			if (ret == false || bytes == 0) {
 				LoseSession(session);
-				InterlockedDecrement16(&session->isRecving);
 			}
 			else
 			{
 				session->recvQ.MoveRear(bytes);
-				InterlockedDecrement16(&session->isRecving);
 				RecvProc(session);
 				//스레드 깨우기용 이벤트 설정
 				SetEvent(session->belongThread->hEvent);
