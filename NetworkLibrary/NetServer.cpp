@@ -110,7 +110,11 @@ bool CNetServer::Disconnect(DWORD64 sessionID)
 		return false;
 	}
 
-	CancelIoEx((HANDLE)InterlockedExchange64((__int64*)&session->sock, session->sock | RELEASE_FLAG), NULL);
+	if (session->timeOutVal > 0) {
+		SetTimeOut(sessionID, 0);
+	}
+	CancelIoEx((HANDLE)session->sock, NULL);
+
 
 	LoseSession(session);
 	return true;
@@ -891,10 +895,10 @@ bool CNetServer::SendPost(SESSION* session)
 			case 10064:
 				break;
 			default:
-				InterlockedExchange8((char*)&session->isSending, false);
 				_FILE_LOG(LOG_LEVEL_ERROR, L"LibraryLog", L"SendPost Error %d", err);
 				OnError(err, L"SendPost Error");
 			}
+			InterlockedExchange8((char*)&session->isSending, false);
 			LoseSession(session);
 			return false;
 		}

@@ -638,7 +638,7 @@ void CGameServer::ReleaseSession(SESSION* session)
     CUnitClass* classPtr = session->belongClass;
     MOVE_INFO info;
 
-    closesocket(sock & ~RELEASE_FLAG);
+    closesocket(sock);
 
     //³²Àº Q Âî²¨±â Á¦°Å
     while (session->sendQ.Dequeue(&packet))
@@ -1179,7 +1179,10 @@ bool CGameServer::Disconnect(DWORD64 sessionID)
         return false;
     }
 
-    CancelIoEx((HANDLE)InterlockedExchange64((__int64*)&session->sock, RELEASE_FLAG), NULL);
+    if (session->timeOutVal > 0) {
+        SetTimeOut(sessionID, 0);
+    }
+    CancelIoEx((HANDLE)session->sock, NULL);
 
     if (session->belongClass == g_defaultClass) {
         LoseSession(session);

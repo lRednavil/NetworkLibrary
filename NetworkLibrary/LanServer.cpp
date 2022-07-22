@@ -90,7 +90,7 @@ bool CLanServer::Disconnect(DWORD64 sessionID)
         return false;
     }
 
-    CancelIoEx((HANDLE)InterlockedExchange64((__int64*)&session->sock, session->sock | RELEASE_FLAG), NULL);
+    CancelIoEx((HANDLE)session->sock, NULL);
 
     LoseSession(session);
     return true;
@@ -346,7 +346,7 @@ void CLanServer::ReleaseSession(SESSION* session)
     int leftCnt;
     CPacket* packet;
     
-    closesocket(session->sock & ~RELEASE_FLAG);
+    closesocket(session->sock);
 
     OnClientLeave(session->sessionID);
 
@@ -622,7 +622,7 @@ bool CLanServer::SendPost(SESSION* session)
         pBuf[cnt].len = packet->GetDataSize();
     }
 
-    ret = WSASend(InterlockedAdd64((__int64*)&session->sock, 0), pBuf, 200, NULL, 0, (LPWSAOVERLAPPED)&session->sendOver, NULL);
+    ret = WSASend(InterlockedAdd64((__int64*)&session->sock, 0), pBuf, sendCnt, NULL, 0, (LPWSAOVERLAPPED)&session->sendOver, NULL);
 
     if (ret == SOCKET_ERROR) {
         err = WSAGetLastError();
@@ -642,8 +642,10 @@ bool CLanServer::SendPost(SESSION* session)
             case 10064:
                 break;
             default:
+                _FILE_LOG(LOG_LEVEL_ERROR, L"LibraryLog", L"SendPost Error %d", err);
                 OnError(err, L"SendPost Error");
             }
+            InterlockedExchange8((char*)&session->isSending, false);
             LoseSession(session);
             return false;
         }
