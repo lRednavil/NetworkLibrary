@@ -135,7 +135,7 @@ bool CNetServer::SendPacket(DWORD64 sessionID, CPacket* packet)
 	}
 	session->sendQ.Enqueue(packet);
 
-	if (InterlockedExchange8((char*)&session->isSending, true) == false) {
+	if (session->sendCnt == 0 && InterlockedExchange8((char*)&session->isSending, true) == false) {
 		PostQueuedCompletionStatus(hIOCP, 0, (ULONG_PTR)session, (LPOVERLAPPED)&g_sendReq_overlap);
 	}
 	else {
@@ -513,7 +513,7 @@ void CNetServer::ReleaseSession(SESSION* session)
 	int leftCnt;
 	CPacket* packet;
 
-	closesocket(session->sock & ~RELEASE_FLAG);
+	closesocket(session->sock);
 
 	//³²Àº Q Âî²¨±â Á¦°Å
 	while (session->sendQ.Dequeue(&packet))

@@ -1207,14 +1207,9 @@ bool CGameServer::SendPacket(DWORD64 sessionID, CPacket* packet)
     }
     session->sendQ.Enqueue(packet);
 
-    if (session->isSending == false) {
-        if (InterlockedExchange8((char*)&session->isSending, true) == false) {
-            PostQueuedCompletionStatus(hIOCP, 0, (ULONG_PTR)session, (LPOVERLAPPED)&g_sendReq_overlap);
-        }
-        else {
-            LoseSession(session);
-        }
-    }
+	if (session->sendCnt == 0 && InterlockedExchange8((char*)&session->isSending, true) == false) {
+		PostQueuedCompletionStatus(hIOCP, 0, (ULONG_PTR)session, (LPOVERLAPPED)&g_sendReq_overlap);
+	}
     else {
         LoseSession(session);
     }
